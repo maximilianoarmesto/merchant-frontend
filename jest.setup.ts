@@ -1,5 +1,11 @@
 import "@testing-library/jest-dom";
 
+// Note: global fetch mocking is enabled via jest-fetch-mock/setupJest in
+// jest.config.ts `setupFiles`.  That file runs before the test framework is
+// installed, ensuring `global.fetch` is replaced before any module under test
+// is evaluated.  Tests can use the `fetchMock` global directly, or import
+// `jest-fetch-mock` and call `fetchMock.resetMocks()` in `beforeEach`.
+
 // React 18 + jsdom emit "act(...) is not supported in production builds" or
 // "not wrapped in act(...)" warnings for state updates triggered by user-event
 // through jsdom's native event dispatching path.  These are cosmetic artefacts
