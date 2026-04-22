@@ -8,19 +8,18 @@
  * 3. Cancel      – open modal → Cancel → modal closes, no new card
  * 4. Backdrop    – open modal → click backdrop → modal closes
  *
- * Cleanup
- * -------
- * Products created during the happy-path test are deleted via the catalog API
- * (DELETE /products/:id) so they don't pollute subsequent runs.
+ * Backend mocking
+ * ---------------
+ * All requests to the catalog API (http://localhost:8001) are intercepted via
+ * Playwright's route API.  No real backend service is required.
  *
  * Environment
  * -----------
- * Expects the full local stack to be running:
- *   NEXT_PUBLIC_CATALOG_API_URL  (default: http://localhost:8001)
- *   Next.js dev server           (default: http://localhost:3000)
+ * NEXT_PUBLIC_CATALOG_API_URL  (default: http://localhost:8001)
+ * Next.js dev server is started automatically via playwright.config.ts webServer.
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Route } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -30,8 +29,37 @@ const CATALOG_API =
   process.env["NEXT_PUBLIC_CATALOG_API_URL"] ?? "http://localhost:8001";
 
 // ---------------------------------------------------------------------------
-// Unique product data – each run uses a different name so stale DB rows from
-// a previous interrupted run can never cause false positives.
+// Fixture product data
+// ---------------------------------------------------------------------------
+
+const PRODUCT_1 = {
+  id: 1,
+  name: "Wireless Headphones",
+  description: "Great sound quality",
+  price: 49.99,
+  currency: "USD",
+  stock: 10,
+  category: "Electronics",
+  is_active: true,
+  created_at: "2024-01-01T00:00:00Z",
+  updated_at: "2024-01-01T00:00:00Z",
+};
+
+const PRODUCT_2 = {
+  id: 2,
+  name: "Mechanical Keyboard",
+  description: "Clicky and fast",
+  price: 129.0,
+  currency: "USD",
+  stock: 5,
+  category: "Peripherals",
+  is_active: true,
+  created_at: "2024-01-02T00:00:00Z",
+  updated_at: "2024-01-02T00:00:00Z",
+};
+
+// ---------------------------------------------------------------------------
+// Unique product data – each run uses a different name so tests are independent
 // ---------------------------------------------------------------------------
 function uniqueProduct() {
   const ts = Date.now();
@@ -45,7 +73,61 @@ function uniqueProduct() {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// API route mock helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Install Playwright route mocks so that all catalog API calls are handled
+ * locally without a real backend.
+ *
+ * - GET  /products         → returns `initialProducts`
+ * - POST /products         → returns the created product and queues the next
+ *                            GET /products to return `initialProducts` + created
+ */
+async function mockCatalogApi(
+  page: Page,
+  initialProducts: object[],
+  createdProduct?: object,
+) {
+  let postCount = 0;
+  const productsUrl = `${CATALOG_API}/products`;
+
+  await page.route(`${productsUrl}`, async (route: Route) => {
+    const method = route.request().method().toUpperCase();
+
+    if (method === "GET") {
+      // After a successful POST, return the refreshed list that includes the
+      // newly created product.
+      const list =
+        postCount > 0 && createdProduct
+          ? [...initialProducts, createdProduct]
+          : initialProducts;
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(list),
+      });
+      return;
+    }
+
+    if (method === "POST" && createdProduct) {
+      postCount += 1;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify(createdProduct),
+      });
+      return;
+    }
+
+    // Unexpected – abort loudly
+    await route.abort("failed");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Page helpers
 // ---------------------------------------------------------------------------
 
 /** Navigate to /products and wait for the page to be interactive. */
@@ -56,9 +138,14 @@ async function gotoProducts(page: Page) {
   await page.waitForSelector(".grid, .state", { timeout: 15_000 });
 }
 
-/** Click "Create Item" and wait for the modal to appear. */
+/** Click "Create Item" and wait for the modal to appear.
+ *
+ * The button carries aria-label="Create a new product"; in a real browser
+ * aria-label is the accessible name and takes precedence over text content,
+ * so we must match on the aria-label value, not the visible "Create Item" text.
+ */
 async function openModal(page: Page) {
-  await page.getByRole("button", { name: "Create Item" }).click();
+  await page.getByRole("button", { name: /create a new product/i }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
 }
 
@@ -78,42 +165,11 @@ async function fillForm(
   await dialog.getByLabel("Category").fill(product.category);
 }
 
-/**
- * Delete a product via the catalog API so the test cleans up after itself.
- * Silently ignores 404 (already gone) so the afterEach hook is idempotent.
- */
-async function deleteProductByName(productName: string): Promise<void> {
-  try {
-    // Find the product by listing all products and matching by name.
-    const listRes = await fetch(`${CATALOG_API}/products`);
-    if (!listRes.ok) return;
-
-    const products: Array<{ id: number; name: string }> = await listRes.json();
-    const target = products.find((p) => p.name === productName);
-    if (!target) return;
-
-    await fetch(`${CATALOG_API}/products/${target.id}`, { method: "DELETE" });
-  } catch {
-    // Network not available or backend not running – swallow silently.
-    // The tests themselves will already have failed in that case.
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
 
 test.describe("Create Item modal", () => {
-  // Track names created during the run so afterEach can clean up.
-  let createdProductName: string | null = null;
-
-  test.afterEach(async () => {
-    if (createdProductName) {
-      await deleteProductByName(createdProductName);
-      createdProductName = null;
-    }
-  });
-
   // -------------------------------------------------------------------------
   // 1. Happy path
   // -------------------------------------------------------------------------
@@ -121,7 +177,21 @@ test.describe("Create Item modal", () => {
     page,
   }) => {
     const product = uniqueProduct();
-    createdProductName = product.name; // register for cleanup
+
+    const createdProduct = {
+      id: 99,
+      name: product.name,
+      description: product.description,
+      price: parseFloat(product.price),
+      currency: "USD",
+      stock: parseInt(product.stock, 10),
+      category: product.category,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    await mockCatalogApi(page, [PRODUCT_1, PRODUCT_2], createdProduct);
 
     await gotoProducts(page);
 
@@ -156,6 +226,8 @@ test.describe("Create Item modal", () => {
   test("validation: shows errors and keeps modal open when required fields are empty", async ({
     page,
   }) => {
+    await mockCatalogApi(page, [PRODUCT_1, PRODUCT_2]);
+
     await gotoProducts(page);
     await openModal(page);
 
@@ -176,15 +248,14 @@ test.describe("Create Item modal", () => {
 
     // Modal must still be open.
     await expect(dialog).toBeVisible();
-
-    // No product should have been created – the grid count is unchanged.
-    // (No cleanup needed since nothing was submitted.)
   });
 
   // -------------------------------------------------------------------------
   // 3. Cancel behaviour
   // -------------------------------------------------------------------------
   test("cancel: modal closes and no new product is added", async ({ page }) => {
+    await mockCatalogApi(page, [PRODUCT_1, PRODUCT_2]);
+
     await gotoProducts(page);
 
     const initialCount = await page.locator(".card").count();
@@ -218,6 +289,8 @@ test.describe("Create Item modal", () => {
   test("backdrop click: modal closes when the backdrop is clicked", async ({
     page,
   }) => {
+    await mockCatalogApi(page, [PRODUCT_1, PRODUCT_2]);
+
     await gotoProducts(page);
     await openModal(page);
 

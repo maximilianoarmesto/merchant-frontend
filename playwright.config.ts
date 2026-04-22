@@ -3,14 +3,14 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Playwright configuration for E2E tests.
  *
- * Tests run against the local dev stack:
- *   - Next.js frontend  → http://localhost:3000
- *   - Catalog API       → http://localhost:8001  (via NEXT_PUBLIC_CATALOG_API_URL)
+ * The `webServer` block starts the Next.js dev server automatically so that
+ * `npm run test:e2e` works without needing a manually-started frontend process.
+ * The backend catalog/checkout APIs are intercepted via Playwright route mocks
+ * inside each test, so no real backend services are required.
  *
- * The `webServer` block is intentionally omitted: `npm run test:e2e` expects
- * the developer to have the full stack running already (e.g. via docker compose
- * or `npm run dev` + backend services). If the dev server is not up the tests
- * will fail fast with a clear network error.
+ * Environment variables:
+ *   PLAYWRIGHT_BASE_URL          override the frontend URL (default: http://localhost:3000)
+ *   NEXT_PUBLIC_CATALOG_API_URL  catalog API base (default: http://localhost:8001)
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -31,6 +31,20 @@ export default defineConfig({
     /* Short action timeout so tests fail fast on DOM issues. */
     actionTimeout: 10_000,
   },
+
+  /* Start the Next.js dev server automatically before the test run.
+   * NODE_ENV is forced to "development" so that Next.js can parse CSS modules
+   * correctly even when the parent shell has NODE_ENV set to "test" (e.g.
+   * after a Jest run in the same terminal session). */
+  webServer: {
+    command: "NODE_ENV=development npm run dev",
+    url: process.env["PLAYWRIGHT_BASE_URL"] ?? "http://localhost:3000",
+    reuseExistingServer: true,
+    timeout: 120_000,
+    stdout: "ignore",
+    stderr: "pipe",
+  },
+
   projects: [
     {
       name: "chromium",
