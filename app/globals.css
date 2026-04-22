@@ -784,6 +784,36 @@ select:disabled {
   gap: 1rem;
 }
 
+/* ---------- Modal form helpers ---------- */
+
+/* Removes the 420 px max-width cap the generic .form applies, so the
+   modal form can grow to fill the panel naturally. */
+.form.modal-form {
+  max-width: 100%;
+}
+
+/* Required-field asterisk */
+.field-required {
+  color: var(--danger);
+  margin-left: 2px;
+}
+
+/* Per-field inline validation message */
+.field-error {
+  display: block;
+  color: var(--danger);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-weight: 400;
+  margin-top: 0.2rem;
+}
+
+/* Currency input — uppercase characters */
+.currency-input {
+  text-transform: uppercase;
+}
+
 /* Skeleton bits */
 .skeleton {
   background: linear-gradient(

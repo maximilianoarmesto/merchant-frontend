@@ -23,7 +23,10 @@ type FormState = {
   currency: string;
   stock: string;
   category: string;
+  image_url: string;
 };
+
+type FormErrors = Partial<Record<keyof FormState, string>>;
 
 const INITIAL_FORM: FormState = {
   name: "",
@@ -32,6 +35,7 @@ const INITIAL_FORM: FormState = {
   currency: "USD",
   stock: "",
   category: "",
+  image_url: "",
 };
 
 export default function CreateProductModal({
@@ -39,8 +43,9 @@ export default function CreateProductModal({
   onClose,
 }: CreateProductModalProps) {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const backdropRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
@@ -77,50 +82,70 @@ export default function CreateProductModal({
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    setError(null);
+    // Clear the inline error for this field as the user types
+    if (fieldErrors[name as keyof FormState]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
+    setApiError(null);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
+  const validate = (): FormErrors => {
+    const errors: FormErrors = {};
     const price = parseFloat(form.price);
     const stock = parseInt(form.stock, 10);
 
     if (!form.name.trim()) {
-      setError("Name is required.");
-      return;
+      errors.name = "Name is required.";
     }
-    if (isNaN(price) || price < 0) {
-      setError("Price must be a valid non-negative number.");
-      return;
+    if (form.price === "" || isNaN(price) || price <= 0) {
+      errors.price = "Price must be a number greater than 0.";
     }
-    if (isNaN(stock) || stock < 0) {
-      setError("Stock must be a valid non-negative integer.");
-      return;
+    if (form.stock === "" || isNaN(stock) || stock < 0) {
+      errors.stock = "Stock must be a whole number of 0 or more.";
     }
     if (!form.category.trim()) {
-      setError("Category is required.");
+      errors.category = "Category is required.";
+    }
+
+    return errors;
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setApiError(null);
+
+    const errors = validate();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
     const payload: ProductCreatePayload = {
       name: form.name.trim(),
-      price,
-      stock,
+      price: parseFloat(form.price),
+      stock: parseInt(form.stock, 10),
       category: form.category.trim(),
       currency: form.currency.trim() || "USD",
-      description: form.description.trim() || null,
+      ...(form.description.trim() && { description: form.description.trim() }),
+      ...(form.image_url.trim() && { image_url: form.image_url.trim() }),
     };
 
     setSubmitting(true);
     try {
       await catalogApi.createProduct(payload);
       onSuccess();
+      onClose();
     } catch (err) {
-      setError((err as Error).message);
+      setApiError((err as Error).message);
       setSubmitting(false);
     }
+  };
+
+  const handleCancel = () => {
+    setForm(INITIAL_FORM);
+    setFieldErrors({});
+    setApiError(null);
+    onClose();
   };
 
   return (
@@ -135,87 +160,92 @@ export default function CreateProductModal({
       <div className="modal-panel">
         <div className="modal-header">
           <div>
-            <span className="eyebrow" style={{ marginBottom: "0.5rem" }}>
-              Catalog
-            </span>
-            <h2 id="modal-title" style={{ fontSize: "1.35rem" }}>
-              Create Item
-            </h2>
+            <span className="eyebrow">Catalog</span>
+            <h2 id="modal-title">New Product</h2>
           </div>
           <button
             type="button"
             className="btn ghost"
-            onClick={onClose}
+            onClick={handleCancel}
             aria-label="Close modal"
-            style={{ padding: "0.4rem 0.6rem" }}
           >
             ✕
           </button>
         </div>
 
-        {error && (
-          <div className="state error" style={{ padding: "0.75rem 1rem", marginBottom: "1.25rem", textAlign: "left" }}>
-            {error}
+        {apiError && (
+          <div className="state error" role="alert">
+            {apiError}
           </div>
         )}
 
-        <form className="form" onSubmit={handleSubmit} style={{ maxWidth: "100%" }}>
-          <label>
-            Name <span aria-hidden="true" style={{ color: "var(--danger)" }}>*</span>
+        <form className="form modal-form" onSubmit={handleSubmit} noValidate>
+          {/* Name */}
+          <label htmlFor="cpm-name">
+            Name <span className="field-required" aria-hidden="true">*</span>
             <input
               ref={firstInputRef}
+              id="cpm-name"
               type="text"
               name="name"
               value={form.name}
               onChange={handleChange}
               placeholder="e.g. Wireless Headphones"
               disabled={submitting}
-              required
+              aria-required="true"
+              aria-describedby={fieldErrors.name ? "cpm-name-error" : undefined}
+              aria-invalid={!!fieldErrors.name}
             />
+            {fieldErrors.name && (
+              <span id="cpm-name-error" className="field-error" role="alert">
+                {fieldErrors.name}
+              </span>
+            )}
           </label>
 
-          <label>
+          {/* Description */}
+          <label htmlFor="cpm-description">
             Description
             <textarea
+              id="cpm-description"
               name="description"
               value={form.description}
               onChange={handleChange}
               placeholder="Optional product description"
               disabled={submitting}
               rows={3}
-              style={{
-                font: "inherit",
-                fontSize: 15,
-                color: "var(--fg)",
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                padding: "0.7rem 0.85rem",
-                borderRadius: "var(--radius)",
-                outline: "none",
-                resize: "vertical",
-                transition: "border-color 0.15s ease, background 0.15s ease",
-              }}
             />
           </label>
 
+          {/* Price + Currency */}
           <div className="modal-row">
-            <label style={{ flex: 1 }}>
-              Price <span aria-hidden="true" style={{ color: "var(--danger)" }}>*</span>
+            <label htmlFor="cpm-price">
+              Price <span className="field-required" aria-hidden="true">*</span>
               <input
+                id="cpm-price"
                 type="number"
                 name="price"
                 value={form.price}
                 onChange={handleChange}
                 placeholder="0.00"
-                min="0"
+                min="0.01"
                 step="0.01"
                 disabled={submitting}
-                required
+                aria-required="true"
+                aria-describedby={fieldErrors.price ? "cpm-price-error" : undefined}
+                aria-invalid={!!fieldErrors.price}
               />
+              {fieldErrors.price && (
+                <span id="cpm-price-error" className="field-error" role="alert">
+                  {fieldErrors.price}
+                </span>
+              )}
             </label>
-            <label style={{ flex: 1 }}>
+
+            <label htmlFor="cpm-currency">
               Currency
               <input
+                id="cpm-currency"
                 type="text"
                 name="currency"
                 value={form.currency}
@@ -223,15 +253,17 @@ export default function CreateProductModal({
                 placeholder="USD"
                 maxLength={3}
                 disabled={submitting}
-                style={{ textTransform: "uppercase" }}
+                className="currency-input"
               />
             </label>
           </div>
 
+          {/* Stock + Category */}
           <div className="modal-row">
-            <label style={{ flex: 1 }}>
-              Stock <span aria-hidden="true" style={{ color: "var(--danger)" }}>*</span>
+            <label htmlFor="cpm-stock">
+              Stock <span className="field-required" aria-hidden="true">*</span>
               <input
+                id="cpm-stock"
                 type="number"
                 name="stock"
                 value={form.stock}
@@ -240,28 +272,58 @@ export default function CreateProductModal({
                 min="0"
                 step="1"
                 disabled={submitting}
-                required
+                aria-required="true"
+                aria-describedby={fieldErrors.stock ? "cpm-stock-error" : undefined}
+                aria-invalid={!!fieldErrors.stock}
               />
+              {fieldErrors.stock && (
+                <span id="cpm-stock-error" className="field-error" role="alert">
+                  {fieldErrors.stock}
+                </span>
+              )}
             </label>
-            <label style={{ flex: 1 }}>
-              Category <span aria-hidden="true" style={{ color: "var(--danger)" }}>*</span>
+
+            <label htmlFor="cpm-category">
+              Category <span className="field-required" aria-hidden="true">*</span>
               <input
+                id="cpm-category"
                 type="text"
                 name="category"
                 value={form.category}
                 onChange={handleChange}
                 placeholder="e.g. Electronics"
                 disabled={submitting}
-                required
+                aria-required="true"
+                aria-describedby={fieldErrors.category ? "cpm-category-error" : undefined}
+                aria-invalid={!!fieldErrors.category}
               />
+              {fieldErrors.category && (
+                <span id="cpm-category-error" className="field-error" role="alert">
+                  {fieldErrors.category}
+                </span>
+              )}
             </label>
           </div>
+
+          {/* Image URL */}
+          <label htmlFor="cpm-image-url">
+            Image URL
+            <input
+              id="cpm-image-url"
+              type="text"
+              name="image_url"
+              value={form.image_url}
+              onChange={handleChange}
+              placeholder="https://example.com/image.jpg"
+              disabled={submitting}
+            />
+          </label>
 
           <div className="modal-footer">
             <button
               type="button"
               className="btn"
-              onClick={onClose}
+              onClick={handleCancel}
               disabled={submitting}
             >
               Cancel
@@ -270,8 +332,9 @@ export default function CreateProductModal({
               type="submit"
               className="btn primary"
               disabled={submitting}
+              aria-busy={submitting}
             >
-              {submitting ? "Creating…" : "Create Item"}
+              {submitting ? "Saving…" : "Save"}
             </button>
           </div>
         </form>
