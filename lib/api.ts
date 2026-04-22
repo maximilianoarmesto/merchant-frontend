@@ -11,6 +11,16 @@ export type Product = {
   updated_at: string;
 };
 
+export type ProductCreatePayload = {
+  name: string;
+  price: number;
+  stock: number;
+  category: string;
+  description?: string | null;
+  image_url?: string | null;
+  currency?: string;
+};
+
 export type CheckoutSession = {
   id: string;
   product_id: number;
@@ -76,6 +86,11 @@ export const catalogApi = {
   listProducts: () => request<Product[]>(`${CATALOG_API_URL}/products`),
   getProduct: (id: number | string) =>
     request<Product>(`${CATALOG_API_URL}/products/${id}`),
+  createProduct: (payload: ProductCreatePayload) =>
+    request<Product>(`${CATALOG_API_URL}/products`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const checkoutApi = {
