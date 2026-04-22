@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import CreateProductModal from "@/components/CreateProductModal";
 import { catalogApi, formatMoney, type Product } from "@/lib/api";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
+  const fetchProducts = useCallback(() => {
     let cancelled = false;
+    setProducts(null);
+    setError(null);
     catalogApi
       .listProducts()
       .then((p) => {
@@ -24,6 +28,16 @@ export default function ProductsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const cancel = fetchProducts();
+    return cancel;
+  }, [fetchProducts]);
+
+  const handleModalSuccess = () => {
+    setIsModalOpen(false);
+    fetchProducts();
+  };
+
   return (
     <div>
       <div className="section-heading">
@@ -35,12 +49,19 @@ export default function ProductsPage() {
           <span className="tag">
             {products ? `${products.length} items` : "Loading…"}
           </span>
+          <button
+            className="btn primary"
+            onClick={() => setIsModalOpen(true)}
+            aria-label="Create a new product"
+          >
+            Create Item
+          </button>
         </div>
       </div>
 
       {error && (
         <div className="state error">
-          We couldn’t load the catalog. <code className="inline-code">{error}</code>
+          We couldn't load the catalog. <code className="inline-code">{error}</code>
         </div>
       )}
 
@@ -117,6 +138,13 @@ export default function ProductsPage() {
             );
           })}
         </div>
+      )}
+
+      {isModalOpen && (
+        <CreateProductModal
+          onSuccess={handleModalSuccess}
+          onClose={() => setIsModalOpen(false)}
+        />
       )}
     </div>
   );
