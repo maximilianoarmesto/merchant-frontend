@@ -840,6 +840,219 @@ textarea[aria-invalid="true"]:focus {
   text-transform: uppercase;
 }
 
+/* ---------- Settings · AI configuration section ---------- */
+
+/*
+ * Panel header — eyebrow + title tightly coupled, matches the same rhythm
+ * used in the product detail and order detail panels.
+ */
+.ai-config-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg-strong);
+  margin-bottom: 0.25rem;
+}
+
+/*
+ * Description text beneath the AI config title — same muted style used in
+ * the checkout and product detail pages.
+ */
+.ai-config-desc {
+  color: var(--fg-muted);
+  font-size: 14px;
+  line-height: 1.55;
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+/*
+ * Full-width form variant for the AI config section — mirrors .form.modal-form
+ * (removes the 420 px cap so the panel can dictate the width instead).
+ */
+.form.ai-config-form {
+  max-width: 100%;
+}
+
+/*
+ * Wrapper for the API key <input>.  Positions the masked-key badge absolutely
+ * inside the right edge of the input, so the badge overlaps the input padding
+ * without shifting surrounding layout.
+ */
+.api-key-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.api-key-wrap input {
+  width: 100%;
+  /* Extra right padding so the text cursor never slides under the badge */
+  padding-right: 5.5rem;
+}
+
+/*
+ * Badge shown when a key is already persisted server-side.  Uses the same
+ * .tag pill language as the rest of the app, but sits flush inside the input.
+ */
+.api-key-badge {
+  position: absolute;
+  right: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid transparent;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+  white-space: nowrap;
+  /* Keep it above the input's inner content */
+  z-index: 1;
+}
+
+/*
+ * Row that holds the "Test Token" and "Save" buttons.
+ * Aligns them to the right so the destructive-ish test action sits on the
+ * left and the affirmative Save sits on the right — mirrors .modal-footer.
+ */
+.ai-config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.25rem;
+}
+
+/*
+ * Inline status message — sits between the form controls and the action
+ * buttons.  Mirrors the .field-error approach but for multi-word feedback
+ * that needs more visual weight than a tiny label.
+ *
+ * Usage:
+ *   <p className="ai-status ai-status--success">…</p>
+ *   <p className="ai-status ai-status--error">…</p>
+ */
+.ai-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  /* Animate in so the user notices the feedback */
+  animation: ai-status-in 0.18s ease forwards;
+}
+
+@keyframes ai-status-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-status--success {
+  color: #1a4a30;
+  background: rgba(30, 90, 55, 0.08);
+  border-color: rgba(30, 90, 55, 0.2);
+}
+
+.ai-status--error {
+  color: var(--danger);
+  background: rgba(122, 31, 31, 0.05);
+  border-color: rgba(122, 31, 31, 0.18);
+}
+
+/* Icon glyph placed before the status message text */
+.ai-status__icon {
+  flex-shrink: 0;
+  line-height: 1.45;
+}
+
+/*
+ * Button success state — used on "Test Token" after a successful probe.
+ * Warm teal-green that clearly reads as positive without clashing with the
+ * existing .btn.primary accent.
+ */
+.btn.success {
+  background: rgba(30, 90, 55, 0.1);
+  color: #1a4a30;
+  border-color: rgba(30, 90, 55, 0.3);
+}
+
+.btn.success:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: rgba(30, 90, 55, 0.18);
+  color: #1a4a30;
+  border-color: rgba(30, 90, 55, 0.4);
+}
+
+/*
+ * Button danger/error state — used on "Test Token" after a failed probe.
+ * Mirrors the --danger colour used across form validation and .state.error.
+ */
+.btn.danger {
+  background: rgba(122, 31, 31, 0.07);
+  color: var(--danger);
+  border-color: rgba(122, 31, 31, 0.28);
+}
+
+.btn.danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: rgba(122, 31, 31, 0.13);
+  color: var(--danger);
+  border-color: rgba(122, 31, 31, 0.4);
+}
+
+/*
+ * Inline spinner — a tiny CSS-only ring that lives inside a button label.
+ * The parent button must set aria-busy="true" and the spinner is placed
+ * alongside or instead of the button text.
+ *
+ * Usage:
+ *   <button className="btn primary" aria-busy="true">
+ *     <span className="spinner" aria-hidden="true" /> Testing…
+ *   </button>
+ */
+.spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spinner-turn 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spinner-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+ * Compact model selector — no styling beyond the base <select>, but adding
+ * an explicit class makes the markup intent clear and gives us a hook for
+ * future per-element overrides without touching global select rules.
+ */
+.model-select {
+  /* inherits all base select styles from the global input/select block */
+}
+
+/* ---------- End Settings · AI configuration section ---------- */
+
 /* Skeleton bits */
 .skeleton {
   background: linear-gradient(
