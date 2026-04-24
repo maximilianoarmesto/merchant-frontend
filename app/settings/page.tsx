@@ -56,11 +56,19 @@ export default function SettingsPage() {
     setSaveError(null);
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
+    // Only include apiKey in the payload when the user has typed a new one.
+    // The backend will fall back to the stored key when the field is omitted.
+    const trimmedKey = apiKey.trim();
+    const payload: { model: string; apiKey?: string } = { model };
+    if (trimmedKey) {
+      payload.apiKey = trimmedKey;
+    }
+
     try {
       const res = await fetch("/api/ai/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey, model }),
+        body: JSON.stringify(payload),
       });
       const data = (await res.json()) as { success?: boolean; error?: string };
 
@@ -85,11 +93,12 @@ export default function SettingsPage() {
     setTestMessage(null);
     if (testTimerRef.current) clearTimeout(testTimerRef.current);
 
-    // Resolve the key to test: the current input value takes priority over
-    // whatever is already stored server-side.
-    const keyToTest = apiKey.trim();
+    // If the user has typed a new key we forward it so the backend tests that
+    // specific key rather than whatever is stored.  If the input is empty the
+    // backend falls back to the stored key automatically.
+    const trimmedKey = apiKey.trim();
 
-    if (!keyToTest && !hasStoredKey) {
+    if (!trimmedKey && !hasStoredKey) {
       setTestStatus("error");
       setTestMessage("Enter an API key before testing.");
       testTimerRef.current = setTimeout(() => {
@@ -100,29 +109,33 @@ export default function SettingsPage() {
     }
 
     try {
-      // Use the OpenAI models endpoint as a lightweight connectivity probe.
-      // If a new key is in the input field we test that; otherwise we rely on
-      // the stored key being forwarded through our own backend.
-      const res = await fetch("https://api.openai.com/v1/models", {
-        headers: {
-          Authorization: `Bearer ${keyToTest}`,
-        },
+      const payload: { model: string; apiKey?: string } = { model };
+      if (trimmedKey) {
+        payload.apiKey = trimmedKey;
+      }
+
+      const res = await fetch("/api/ai/config/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
+      const data = (await res.json()) as {
+        ok?: boolean;
+        model?: string;
+        error?: string;
+      };
+
+      if (res.ok && data.ok) {
+        const confirmedModel = data.model ?? model;
         setTestStatus("success");
-        setTestMessage("API key is valid and the connection succeeded.");
+        setTestMessage(`Token is valid — model: ${confirmedModel}`);
         testTimerRef.current = setTimeout(() => {
           setTestStatus("idle");
           setTestMessage(null);
         }, 5000);
       } else {
-        const errData = (await res.json().catch(() => ({}))) as {
-          error?: { message?: string };
-        };
-        throw new Error(
-          errData.error?.message ?? `OpenAI returned ${res.status}.`,
-        );
+        throw new Error(data.error ?? `Request failed with status ${res.status}.`);
       }
     } catch (err) {
       setTestStatus("error");
@@ -174,7 +187,9 @@ export default function SettingsPage() {
                   <input
                     id="settings-api-key"
                     type="password"
-                    placeholder={hasStoredKey ? "Leave blank to keep existing key" : "sk-…"}
+                    placeholder={
+                      hasStoredKey ? "sk-••••••••  (leave blank to keep existing)" : "sk-…"
+                    }
                     value={apiKey}
                     onChange={(e) => {
                       setApiKey(e.target.value);
@@ -338,7 +353,7 @@ export default function SettingsPage() {
                 </code>
               </dd>
               <dt>Environment</dt>
-              <dd>local</dd>
+              <dd>{process.env.NEXT_PUBLIC_ENV || "local"}</dd>
             </dl>
           </div>
         </aside>

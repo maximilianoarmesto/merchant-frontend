@@ -56,9 +56,15 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const { apiKey, model } = body as Record<string, unknown>;
 
-  if (typeof apiKey !== "string" || apiKey.trim() === "") {
+  // apiKey is optional when one is already stored — in that case we keep the
+  // existing key and only update the model.  An explicitly supplied apiKey
+  // must still be a non-empty string.
+  const hasNewKey = typeof apiKey === "string" && apiKey.trim().length > 0;
+  const keyProvided = apiKey !== undefined && apiKey !== null;
+
+  if (keyProvided && !hasNewKey) {
     return NextResponse.json(
-      { error: "apiKey is required and must be a non-empty string." },
+      { error: "apiKey must be a non-empty string when provided." },
       { status: 400 },
     );
   }
@@ -70,8 +76,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
+  // When no new key is supplied we fall back to the stored key.  If neither
+  // exists the save is rejected — there must be a key in the config.
+  const stored = readConfig();
+  const resolvedKey = hasNewKey
+    ? (apiKey as string).trim()
+    : stored.apiKey;
+
+  if (!resolvedKey) {
+    return NextResponse.json(
+      { error: "apiKey is required — no key has been saved yet." },
+      { status: 400 },
+    );
+  }
+
   try {
-    writeConfig({ apiKey: apiKey.trim(), model: model.trim() });
+    writeConfig({ apiKey: resolvedKey, model: model.trim() });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to save configuration.";
     return NextResponse.json({ error: message }, { status: 500 });
