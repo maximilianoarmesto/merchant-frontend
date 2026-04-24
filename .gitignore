@@ -14,6 +14,9 @@ dist/
 .env.*
 !.env.example
 
+# AI configuration (contains OpenAI API key — never commit)
+.ai-config.json
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

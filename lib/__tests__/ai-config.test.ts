@@ -29,7 +29,7 @@ import { readConfig, writeConfig } from "../ai-config";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const CONFIG_PATH = path.resolve(process.cwd(), "ai-config.json");
+const CONFIG_PATH = path.resolve(process.cwd(), ".ai-config.json");
 
 function mockFileContent(content: object | string) {
   const raw = typeof content === "string" ? content : JSON.stringify(content);

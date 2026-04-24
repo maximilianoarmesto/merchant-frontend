@@ -19,6 +19,10 @@ const config: Config = {
     "^.+\\.(t|j)sx?$": ["babel-jest", { configFile: "./babel.config.test.js" }],
   },
   moduleNameMapper: {
+    // Prevent the server-only guard from throwing in the Jest / jsdom
+    // environment.  The real package throws at runtime when imported outside
+    // a React Server Component; in tests we simply want a no-op.
+    "^server-only$": "<rootDir>/node_modules/server-only/empty.js",
     "^@/(.*)$": "<rootDir>/$1",
   },
   testMatch: ["**/__tests__/**/*.test.(ts|tsx)"],
