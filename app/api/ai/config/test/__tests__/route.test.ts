@@ -72,6 +72,29 @@ async function parseBody(response: Response): Promise<unknown> {
   return response.json();
 }
 
+/**
+ * Return the `Authorization` header value sent to OpenAI in the most recent
+ * fetch call, regardless of whether the headers were passed as a plain object
+ * or as a `Headers` instance (the OpenAI SDK v6 always uses `Headers`).
+ *
+ * HTTP header names are case-insensitive; we check both "authorization" and
+ * "Authorization" so the helper works with both SDK versions.
+ */
+function getAuthHeaderFromLastFetchCall(): string | null | undefined {
+  const calls = (fetchMock as unknown as jest.Mock).mock.calls;
+  if (calls.length === 0) return undefined;
+  // fetchMock records calls as [input, init?]
+  const [, init] = calls[calls.length - 1] as [unknown, RequestInit?];
+  if (!init?.headers) return undefined;
+
+  if (init.headers instanceof Headers) {
+    return init.headers.get("authorization") ?? init.headers.get("Authorization");
+  }
+  // Plain object (e.g. from an older route implementation using raw fetch).
+  const h = init.headers as Record<string, string>;
+  return h["authorization"] ?? h["Authorization"];
+}
+
 /** Program fetchMock to return a successful OpenAI models response. */
 function mockOpenAiSuccess(): void {
   fetchMock.mockResponseOnce(
@@ -173,26 +196,18 @@ describe("successful probe using body apiKey", () => {
     await POST(req);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.openai.com/v1/models",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer sk-body-key",
-        }),
-      }),
+      expect.anything(),
     );
+    // The OpenAI SDK v6 uses a `Headers` instance (case-insensitive); use the
+    // helper to normalise the lookup across both plain-object and Headers forms.
+    expect(getAuthHeaderFromLastFetchCall()).toBe("Bearer sk-body-key");
   });
 
   it("trims whitespace from the apiKey before sending it to OpenAI", async () => {
     mockOpenAiSuccess();
     const req = makeRequest({ apiKey: "  sk-padded  ", model: "gpt-4o" });
     await POST(req);
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/models",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer sk-padded",
-        }),
-      }),
-    );
+    expect(getAuthHeaderFromLastFetchCall()).toBe("Bearer sk-padded");
   });
 });
 
@@ -218,26 +233,16 @@ describe("successful probe using stored key as fallback", () => {
     await POST(req);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.openai.com/v1/models",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer sk-stored",
-        }),
-      }),
+      expect.anything(),
     );
+    expect(getAuthHeaderFromLastFetchCall()).toBe("Bearer sk-stored");
   });
 
   it("body key takes priority over stored key", async () => {
     mockOpenAiSuccess();
     const req = makeRequest({ apiKey: "sk-new", model: "gpt-4o" });
     await POST(req);
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/models",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer sk-new",
-        }),
-      }),
-    );
+    expect(getAuthHeaderFromLastFetchCall()).toBe("Bearer sk-new");
   });
 
   it("uses stored model when no model is in the body", async () => {
@@ -348,15 +353,12 @@ describe("malformed or non-object body", () => {
     const req = makeRequest([{ apiKey: "sk-arr" }]);
     const res = await POST(req);
     expect(res.status).toBe(200);
-    // Array body is ignored — uses stored key
+    // Array body is ignored — uses stored key.
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.openai.com/v1/models",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer sk-stored",
-        }),
-      }),
+      expect.anything(),
     );
+    expect(getAuthHeaderFromLastFetchCall()).toBe("Bearer sk-stored");
   });
 });
 
