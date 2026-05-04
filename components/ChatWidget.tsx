@@ -12,6 +12,10 @@ interface Message {
   id: number;
   role: Role;
   text: string;
+  /** True when the message represents an error response (no_config, network
+   *  failure, or any other non-success reply).  Drives the chat-bubble--error
+   *  modifier class so error messages are visually distinct from normal replies. */
+  isError?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +93,7 @@ export default function ChatWidget() {
 
         setMessages((prev) => [
           ...prev,
-          { id: nextId(), role: "assistant", text: errorText },
+          { id: nextId(), role: "assistant", text: errorText, isError: true },
         ]);
       } else {
         setMessages((prev) => [
@@ -104,6 +108,7 @@ export default function ChatWidget() {
           id: nextId(),
           role: "assistant",
           text: "Network error — could not reach the assistant.",
+          isError: true,
         },
       ]);
     } finally {
@@ -214,7 +219,13 @@ export default function ChatWidget() {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`chat-bubble chat-bubble--${msg.role}`}
+                className={[
+                  "chat-bubble",
+                  `chat-bubble--${msg.role}`,
+                  msg.isError ? "chat-bubble--error" : "",
+                ]
+                  .join(" ")
+                  .trim()}
                 data-testid={`chat-bubble-${msg.role}`}
               >
                 {msg.text}
