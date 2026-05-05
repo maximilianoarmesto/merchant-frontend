@@ -1349,6 +1349,22 @@ textarea[aria-invalid="true"]:focus {
   }
 }
 
+/*
+ * Inline Settings hyperlink shown inside the no_config error bubble.
+ * Inherits the danger colour from its .chat-bubble--error parent and adds
+ * an underline so it reads clearly as an interactive link.
+ */
+.chat-settings-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 600;
+}
+
+.chat-settings-link:hover {
+  opacity: 0.8;
+}
+
 /* ---------- End ChatWidget ---------- */
 
 /* Skeleton bits */

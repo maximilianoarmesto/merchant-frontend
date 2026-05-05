@@ -8,6 +8,12 @@ import { useEffect, useRef, useState } from "react";
 
 type Role = "user" | "assistant";
 
+/** A single turn stored in conversation history and sent to the API. */
+interface HistoryEntry {
+  role: Role;
+  content: string;
+}
+
 interface Message {
   id: number;
   role: Role;
@@ -16,6 +22,8 @@ interface Message {
    *  failure, or any other non-success reply).  Drives the chat-bubble--error
    *  modifier class so error messages are visually distinct from normal replies. */
   isError?: boolean;
+  /** When true, the bubble renders a link to /settings alongside the text. */
+  isNoConfig?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -39,6 +47,12 @@ function nextId(): number {
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  /**
+   * Conversation history in the format expected by POST /api/ai/chat.
+   * Kept in sync with `messages` but only contains successfully sent user
+   * turns and the corresponding assistant replies — errors are not included.
+   */
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -76,29 +90,58 @@ export default function ChatWidget() {
     setInput("");
     setLoading(true);
 
+    // Snapshot of history at the time this request is sent.
+    // We read it from the state variable but we cannot call setHistory
+    // inside the try block safely before awaiting, so we capture the current
+    // value via a functional updater pattern after the response.
+    let currentHistory: HistoryEntry[] = [];
+    setHistory((prev) => {
+      currentHistory = prev;
+      return prev; // no change yet
+    });
+
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify(
+          currentHistory.length > 0
+            ? { message: trimmed, history: currentHistory }
+            : { message: trimmed },
+        ),
       });
 
       const data = (await res.json()) as { reply?: string; error?: string };
 
       if (!res.ok || data.error) {
-        const errorText =
-          data.error === "no_config"
-            ? NO_CONFIG_TEXT
-            : (data.error ?? `Request failed with status ${res.status}.`);
+        const isNoConfig = data.error === "no_config";
+        const errorText = isNoConfig
+          ? NO_CONFIG_TEXT
+          : (data.error ?? `Request failed with status ${res.status}.`);
 
         setMessages((prev) => [
           ...prev,
-          { id: nextId(), role: "assistant", text: errorText, isError: true },
+          {
+            id: nextId(),
+            role: "assistant",
+            text: errorText,
+            isError: true,
+            isNoConfig,
+          },
         ]);
+        // Error responses are not added to the conversation history so the
+        // next user message starts a clean exchange.
       } else {
+        const reply = data.reply ?? "";
         setMessages((prev) => [
           ...prev,
-          { id: nextId(), role: "assistant", text: data.reply ?? "" },
+          { id: nextId(), role: "assistant", text: reply },
+        ]);
+        // Append this successful exchange to the history.
+        setHistory((prev) => [
+          ...prev,
+          { role: "user", content: trimmed },
+          { role: "assistant", content: reply },
         ]);
       }
     } catch {
@@ -122,6 +165,30 @@ export default function ChatWidget() {
       void handleSend();
     }
   };
+
+  // ---------------------------------------------------------------------------
+  // Render helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Render the content of a chat bubble.
+   * For the `no_config` case we embed an inline link to /settings so the user
+   * can navigate there without leaving the context of the chat.
+   */
+  function renderBubbleContent(msg: Message) {
+    if (msg.isNoConfig) {
+      return (
+        <>
+          AI assistant is not configured. Add an OpenAI API key in{" "}
+          <a href="/settings" className="chat-settings-link">
+            Settings
+          </a>{" "}
+          to get started.
+        </>
+      );
+    }
+    return msg.text;
+  }
 
   // ---------------------------------------------------------------------------
   // Render
@@ -190,7 +257,7 @@ export default function ChatWidget() {
         >
           {/* Header */}
           <div className="chat-header" data-testid="chat-header">
-            <span className="chat-title">AI assistant</span>
+            <span className="chat-title">Merchant Assistant</span>
             <button
               type="button"
               className="btn ghost chat-close"
@@ -228,7 +295,7 @@ export default function ChatWidget() {
                   .trim()}
                 data-testid={`chat-bubble-${msg.role}`}
               >
-                {msg.text}
+                {renderBubbleContent(msg)}
               </div>
             ))}
 
