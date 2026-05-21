@@ -1,5 +1,5 @@
 /**
- * Unit tests for catalogApi.createProduct in lib/api.ts.
+ * Unit tests for catalogApi.createProduct and catalogApi.listProducts in lib/api.ts.
  *
  * Strategy
  * --------
@@ -9,8 +9,9 @@
  * mocked fetch to verify method, URL, headers, and request body.
  *
  * CATALOG_API_URL defaults to "http://localhost:8001" when the env var is
- * absent, so the expected POST target is:
- *   http://localhost:8001/products
+ * absent, so the expected targets are:
+ *   GET  http://localhost:8001/products       → listProducts()
+ *   POST http://localhost:8001/products       → createProduct()
  *
  * Error-handling contract (from the `request` helper):
  *   - Non-ok HTTP response  → throws Error("<status> <detail>")
@@ -18,7 +19,12 @@
  */
 
 import fetchMock from "jest-fetch-mock";
-import { catalogApi, type Product, type ProductCreatePayload } from "../api";
+import {
+  catalogApi,
+  type ListProductsParams,
+  type Product,
+  type ProductCreatePayload,
+} from "../api";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -420,5 +426,435 @@ describe("network failure", () => {
       () => { /* expected rejection */ },
     );
     expect(resolved).toBe(false);
+  });
+});
+
+// ===========================================================================
+// catalogApi.listProducts — price filter query parameters
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Fixtures for listProducts tests
+// ---------------------------------------------------------------------------
+
+const PRODUCT_CHEAP: Product = {
+  id: 10,
+  name: "Budget Widget",
+  description: "Affordable",
+  price: 5.0,
+  currency: "USD",
+  stock: 100,
+  category: "Widgets",
+  is_active: true,
+  created_at: "2024-06-01T00:00:00Z",
+  updated_at: "2024-06-01T00:00:00Z",
+};
+
+const PRODUCT_MID: Product = {
+  id: 11,
+  name: "Standard Widget",
+  description: "Mid-range",
+  price: 30.0,
+  currency: "USD",
+  stock: 50,
+  category: "Widgets",
+  is_active: true,
+  created_at: "2024-06-01T00:00:00Z",
+  updated_at: "2024-06-01T00:00:00Z",
+};
+
+const PRODUCT_EXPENSIVE: Product = {
+  id: 12,
+  name: "Premium Widget",
+  description: "Top tier",
+  price: 100.0,
+  currency: "USD",
+  stock: 10,
+  category: "Widgets",
+  is_active: true,
+  created_at: "2024-06-01T00:00:00Z",
+  updated_at: "2024-06-01T00:00:00Z",
+};
+
+// ===========================================================================
+// 10. listProducts — no params (no regression)
+// ===========================================================================
+describe("listProducts — no params", () => {
+  it("calls GET /products without a query string when no params are given", async () => {
+    fetchMock.mockResponseOnce(
+      JSON.stringify([PRODUCT_CHEAP, PRODUCT_MID, PRODUCT_EXPENSIVE]),
+      { status: 200 },
+    );
+
+    await catalogApi.listProducts();
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe("/products");
+    expect(parsed.search).toBe("");
+  });
+
+  it("calls GET /products without a query string when an empty params object is given", async () => {
+    fetchMock.mockResponseOnce(
+      JSON.stringify([PRODUCT_CHEAP, PRODUCT_MID, PRODUCT_EXPENSIVE]),
+      { status: 200 },
+    );
+
+    await catalogApi.listProducts({});
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.search).toBe("");
+  });
+
+  it("resolves with the full product list when no params are given", async () => {
+    const allProducts = [PRODUCT_CHEAP, PRODUCT_MID, PRODUCT_EXPENSIVE];
+    fetchMock.mockResponseOnce(JSON.stringify(allProducts), { status: 200 });
+
+    const result = await catalogApi.listProducts();
+
+    expect(result).toEqual(allProducts);
+  });
+
+  it("resolves with an empty array when the server returns an empty list", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([]), { status: 200 });
+
+    const result = await catalogApi.listProducts();
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ===========================================================================
+// 11. listProducts — min_price only
+// ===========================================================================
+describe("listProducts — min_price only", () => {
+  it("appends min_price as a query parameter", async () => {
+    fetchMock.mockResponseOnce(
+      JSON.stringify([PRODUCT_MID, PRODUCT_EXPENSIVE]),
+      { status: 200 },
+    );
+
+    await catalogApi.listProducts({ min_price: 10 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("min_price")).toBe("10");
+  });
+
+  it("does not append max_price when only min_price is provided", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_MID]), { status: 200 });
+
+    await catalogApi.listProducts({ min_price: 10 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.has("max_price")).toBe(false);
+  });
+
+  it("resolves with the filtered product list for min_price", async () => {
+    const filtered = [PRODUCT_MID, PRODUCT_EXPENSIVE];
+    fetchMock.mockResponseOnce(JSON.stringify(filtered), { status: 200 });
+
+    const result = await catalogApi.listProducts({ min_price: 10 });
+
+    expect(result).toEqual(filtered);
+  });
+
+  it("resolves with an empty array when no products satisfy min_price", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([]), { status: 200 });
+
+    const result = await catalogApi.listProducts({ min_price: 9999 });
+
+    expect(result).toEqual([]);
+  });
+
+  it("encodes a decimal min_price correctly", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_MID]), { status: 200 });
+
+    await catalogApi.listProducts({ min_price: 10.5 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("min_price")).toBe("10.5");
+  });
+
+  it("accepts min_price of 0", async () => {
+    fetchMock.mockResponseOnce(
+      JSON.stringify([PRODUCT_CHEAP, PRODUCT_MID, PRODUCT_EXPENSIVE]),
+      { status: 200 },
+    );
+
+    await catalogApi.listProducts({ min_price: 0 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("min_price")).toBe("0");
+  });
+});
+
+// ===========================================================================
+// 12. listProducts — max_price only
+// ===========================================================================
+describe("listProducts — max_price only", () => {
+  it("appends max_price as a query parameter", async () => {
+    fetchMock.mockResponseOnce(
+      JSON.stringify([PRODUCT_CHEAP, PRODUCT_MID]),
+      { status: 200 },
+    );
+
+    await catalogApi.listProducts({ max_price: 50 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("max_price")).toBe("50");
+  });
+
+  it("does not append min_price when only max_price is provided", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_CHEAP]), { status: 200 });
+
+    await catalogApi.listProducts({ max_price: 50 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.has("min_price")).toBe(false);
+  });
+
+  it("resolves with the filtered product list for max_price", async () => {
+    const filtered = [PRODUCT_CHEAP, PRODUCT_MID];
+    fetchMock.mockResponseOnce(JSON.stringify(filtered), { status: 200 });
+
+    const result = await catalogApi.listProducts({ max_price: 50 });
+
+    expect(result).toEqual(filtered);
+  });
+
+  it("resolves with an empty array when no products satisfy max_price", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([]), { status: 200 });
+
+    const result = await catalogApi.listProducts({ max_price: 0.01 });
+
+    expect(result).toEqual([]);
+  });
+
+  it("encodes a decimal max_price correctly", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_CHEAP]), { status: 200 });
+
+    await catalogApi.listProducts({ max_price: 49.99 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("max_price")).toBe("49.99");
+  });
+});
+
+// ===========================================================================
+// 13. listProducts — min_price and max_price together (price range)
+// ===========================================================================
+describe("listProducts — min_price and max_price together", () => {
+  it("appends both min_price and max_price as query parameters", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_MID]), { status: 200 });
+
+    await catalogApi.listProducts({ min_price: 10, max_price: 50 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("min_price")).toBe("10");
+    expect(parsed.searchParams.get("max_price")).toBe("50");
+  });
+
+  it("resolves with only products within the price range", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_MID]), { status: 200 });
+
+    const result = await catalogApi.listProducts({ min_price: 10, max_price: 50 });
+
+    expect(result).toEqual([PRODUCT_MID]);
+  });
+
+  it("resolves with an empty array when no products fall within the range", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([]), { status: 200 });
+
+    const result = await catalogApi.listProducts({ min_price: 200, max_price: 300 });
+
+    expect(result).toEqual([]);
+  });
+
+  it("accepts equal min_price and max_price (exact match)", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_MID]), { status: 200 });
+
+    await catalogApi.listProducts({ min_price: 30, max_price: 30 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("min_price")).toBe("30");
+    expect(parsed.searchParams.get("max_price")).toBe("30");
+  });
+});
+
+// ===========================================================================
+// 14. listProducts — name + min_price + max_price combined
+// ===========================================================================
+describe("listProducts — name combined with price params", () => {
+  it("appends name, min_price, and max_price together", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_MID]), { status: 200 });
+
+    await catalogApi.listProducts({ name: "shoe", min_price: 10, max_price: 50 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("name")).toBe("shoe");
+    expect(parsed.searchParams.get("min_price")).toBe("10");
+    expect(parsed.searchParams.get("max_price")).toBe("50");
+  });
+
+  it("appends name and min_price (without max_price)", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_MID]), { status: 200 });
+
+    await catalogApi.listProducts({ name: "widget", min_price: 20 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("name")).toBe("widget");
+    expect(parsed.searchParams.get("min_price")).toBe("20");
+    expect(parsed.searchParams.has("max_price")).toBe(false);
+  });
+
+  it("appends name and max_price (without min_price)", async () => {
+    fetchMock.mockResponseOnce(JSON.stringify([PRODUCT_CHEAP]), { status: 200 });
+
+    await catalogApi.listProducts({ name: "widget", max_price: 15 });
+
+    const [url] = getSingleFetchCall();
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("name")).toBe("widget");
+    expect(parsed.searchParams.get("max_price")).toBe("15");
+    expect(parsed.searchParams.has("min_price")).toBe(false);
+  });
+
+  it("resolves with the filtered list when all three params are combined", async () => {
+    const filtered = [PRODUCT_MID];
+    fetchMock.mockResponseOnce(JSON.stringify(filtered), { status: 200 });
+
+    const result = await catalogApi.listProducts({
+      name: "shoe",
+      min_price: 10,
+      max_price: 50,
+    });
+
+    expect(result).toEqual(filtered);
+  });
+});
+
+// ===========================================================================
+// 15. listProducts — invalid price params return 422-style error (no fetch)
+// ===========================================================================
+describe("listProducts — invalid price params (HTTP 422)", () => {
+  it("throws without making a fetch call when min_price is negative", async () => {
+    await expect(
+      catalogApi.listProducts({ min_price: -1 }),
+    ).rejects.toThrow();
+
+    expect(fetchMock.mock.calls).toHaveLength(0);
+  });
+
+  it("includes '422' in the error message for negative min_price", async () => {
+    await expect(
+      catalogApi.listProducts({ min_price: -1 }),
+    ).rejects.toThrow("422");
+  });
+
+  it("includes a descriptive message for negative min_price", async () => {
+    await expect(
+      catalogApi.listProducts({ min_price: -1 }),
+    ).rejects.toThrow(/min_price/i);
+  });
+
+  it("throws without making a fetch call when max_price is negative", async () => {
+    await expect(
+      catalogApi.listProducts({ max_price: -0.01 }),
+    ).rejects.toThrow();
+
+    expect(fetchMock.mock.calls).toHaveLength(0);
+  });
+
+  it("includes '422' in the error message for negative max_price", async () => {
+    await expect(
+      catalogApi.listProducts({ max_price: -5 }),
+    ).rejects.toThrow("422");
+  });
+
+  it("includes a descriptive message for negative max_price", async () => {
+    await expect(
+      catalogApi.listProducts({ max_price: -5 }),
+    ).rejects.toThrow(/max_price/i);
+  });
+
+  it("throws when min_price is NaN", async () => {
+    await expect(
+      catalogApi.listProducts({ min_price: NaN }),
+    ).rejects.toThrow("422");
+  });
+
+  it("throws when max_price is NaN", async () => {
+    await expect(
+      catalogApi.listProducts({ max_price: NaN }),
+    ).rejects.toThrow("422");
+  });
+
+  it("throws when min_price is Infinity", async () => {
+    await expect(
+      catalogApi.listProducts({ min_price: Infinity }),
+    ).rejects.toThrow("422");
+  });
+
+  it("throws when min_price is greater than max_price", async () => {
+    await expect(
+      catalogApi.listProducts({ min_price: 100, max_price: 50 }),
+    ).rejects.toThrow("422");
+  });
+
+  it("includes a descriptive message when min_price > max_price", async () => {
+    await expect(
+      catalogApi.listProducts({ min_price: 100, max_price: 50 }),
+    ).rejects.toThrow(/min_price.*max_price|max_price.*min_price/i);
+  });
+
+  it("does not make a fetch call when min_price > max_price", async () => {
+    await expect(
+      catalogApi.listProducts({ min_price: 100, max_price: 50 }),
+    ).rejects.toThrow();
+
+    expect(fetchMock.mock.calls).toHaveLength(0);
+  });
+});
+
+// ===========================================================================
+// 16. listProducts — HTTP and network error propagation
+// ===========================================================================
+describe("listProducts — HTTP error propagation", () => {
+  it("throws on a 500 response from GET /products", async () => {
+    fetchMock.mockResponseOnce(
+      JSON.stringify({ detail: "Internal Server Error" }),
+      { status: 500 },
+    );
+
+    await expect(catalogApi.listProducts()).rejects.toThrow("500");
+  });
+
+  it("includes the API error detail in the thrown error message", async () => {
+    fetchMock.mockResponseOnce(
+      JSON.stringify({ detail: "Database unavailable" }),
+      { status: 503 },
+    );
+
+    await expect(catalogApi.listProducts()).rejects.toThrow("Database unavailable");
+  });
+
+  it("propagates network failures", async () => {
+    fetchMock.mockRejectOnce(new Error("Network request failed"));
+
+    await expect(catalogApi.listProducts({ min_price: 10 })).rejects.toThrow(
+      "Network request failed",
+    );
   });
 });

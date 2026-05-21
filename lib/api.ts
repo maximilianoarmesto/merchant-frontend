@@ -82,8 +82,71 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+export type ListProductsParams = {
+  name?: string;
+  min_price?: number;
+  max_price?: number;
+};
+
+/**
+ * Validate price filter params before sending to the catalog service.
+ * Mirrors the HTTP 422 validation the backend would apply, so callers get a
+ * clear error message without an unnecessary network round-trip.
+ *
+ * Rules:
+ *   - min_price and max_price must be finite numbers (non-NaN, non-Infinity)
+ *   - Both values must be ≥ 0
+ *   - When both are supplied, min_price must be ≤ max_price
+ */
+function validatePriceParams(params: ListProductsParams): void {
+  const { min_price, max_price } = params;
+
+  if (min_price !== undefined) {
+    if (!Number.isFinite(min_price) || min_price < 0) {
+      throw new Error(
+        "422 min_price must be a non-negative number",
+      );
+    }
+  }
+
+  if (max_price !== undefined) {
+    if (!Number.isFinite(max_price) || max_price < 0) {
+      throw new Error(
+        "422 max_price must be a non-negative number",
+      );
+    }
+  }
+
+  if (
+    min_price !== undefined &&
+    max_price !== undefined &&
+    min_price > max_price
+  ) {
+    throw new Error(
+      "422 min_price must be less than or equal to max_price",
+    );
+  }
+}
+
 export const catalogApi = {
-  listProducts: () => request<Product[]>(`${CATALOG_API_URL}/products`),
+  listProducts: (params: ListProductsParams = {}): Promise<Product[]> => {
+    try {
+      validatePriceParams(params);
+    } catch (err) {
+      return Promise.reject(err);
+    }
+    const qs = new URLSearchParams();
+    if (params.name !== undefined) qs.set("name", params.name);
+    if (params.min_price !== undefined)
+      qs.set("min_price", String(params.min_price));
+    if (params.max_price !== undefined)
+      qs.set("max_price", String(params.max_price));
+    const query = qs.toString();
+    const url = query
+      ? `${CATALOG_API_URL}/products?${query}`
+      : `${CATALOG_API_URL}/products`;
+    return request<Product[]>(url);
+  },
   getProduct: (id: number | string) =>
     request<Product>(`${CATALOG_API_URL}/products/${id}`),
   createProduct: (payload: ProductCreatePayload) =>
