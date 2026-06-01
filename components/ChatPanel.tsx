@@ -9,15 +9,29 @@ import {
   type StoredMessage,
 } from "@/lib/conversation-store";
 import ConversationSidebar from "@/components/ConversationSidebar";
+import {
+  CheckoutCard,
+  OrderConfirmationCard,
+  PaymentErrorCard,
+} from "@/components/ChatCards";
+import { parseToolResultCard } from "@/lib/chat-cards";
+import { commerceTools } from "@/lib/chat-tools";
+import type { ToolDefinition } from "@/lib/chat-adapter";
 
 interface ChatPanelProps {
   store?: ConversationStore;
+  /** Tools used to fulfil in-card actions (e.g. process_payment). Injectable for tests. */
+  tools?: ToolDefinition[];
 }
 
-export default function ChatPanel({ store = defaultStore }: ChatPanelProps) {
+export default function ChatPanel({
+  store = defaultStore,
+  tools = commerceTools,
+}: ChatPanelProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [payingSessionId, setPayingSessionId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     setConversations(store.listConversations());
@@ -48,6 +62,23 @@ export default function ChatPanel({ store = defaultStore }: ChatPanelProps) {
   const handleToggleSidebar = useCallback(() => {
     setSidebarOpen((open) => !open);
   }, []);
+
+  const handleConfirmPurchase = useCallback(
+    async (sessionId: string) => {
+      if (!activeId) return;
+      const payTool = tools.find((t) => t.name === "process_payment");
+      if (!payTool) return;
+      setPayingSessionId(sessionId);
+      try {
+        const result = await payTool.execute({ session_id: sessionId });
+        store.appendMessage(activeId, { role: "tool", content: result });
+        refresh();
+      } finally {
+        setPayingSessionId(null);
+      }
+    },
+    [activeId, tools, store, refresh]
+  );
 
   return (
     <div
@@ -97,17 +128,39 @@ export default function ChatPanel({ store = defaultStore }: ChatPanelProps) {
                 : "Select a conversation, or start a new chat."}
             </div>
           ) : (
-            messages.map((m, idx) => (
-              <div
-                key={`${activeConversation?.id ?? "none"}-${idx}`}
-                className={`chat-message role-${m.role}`}
-                data-testid="chat-message"
-                data-role={m.role}
-              >
-                <span className="chat-message-role">{m.role}</span>
-                <span className="chat-message-content">{m.content}</span>
-              </div>
-            ))
+            messages.map((m, idx) => {
+              const key = `${activeConversation?.id ?? "none"}-${idx}`;
+              if (m.role === "tool") {
+                const card = parseToolResultCard(m.content);
+                if (card?.kind === "checkout") {
+                  return (
+                    <CheckoutCard
+                      key={key}
+                      session={card.session}
+                      pending={payingSessionId === card.session.id}
+                      onConfirm={handleConfirmPurchase}
+                    />
+                  );
+                }
+                if (card?.kind === "order") {
+                  return <OrderConfirmationCard key={key} order={card.order} />;
+                }
+                if (card?.kind === "error") {
+                  return <PaymentErrorCard key={key} reason={card.reason} />;
+                }
+              }
+              return (
+                <div
+                  key={key}
+                  className={`chat-message role-${m.role}`}
+                  data-testid="chat-message"
+                  data-role={m.role}
+                >
+                  <span className="chat-message-role">{m.role}</span>
+                  <span className="chat-message-content">{m.content}</span>
+                </div>
+              );
+            })
           )}
         </div>
       </section>

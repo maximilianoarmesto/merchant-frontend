@@ -906,6 +906,103 @@ select:disabled {
   word-break: break-word;
 }
 
+/* Inline commerce cards (checkout / order / error) — visually distinct from
+   plain text message bubbles: elevated surface, accent border, structured rows. */
+.chat-card {
+  align-self: flex-start;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.chat-card.order-card {
+  border-color: var(--success, #1a7f47);
+}
+
+.chat-card.error-card {
+  border-color: var(--danger, #c0392b);
+}
+
+.chat-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.chat-card-badge {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.chat-card-badge.success {
+  background: rgba(26, 127, 71, 0.14);
+  color: var(--success, #1a7f47);
+}
+
+.chat-card-badge.error {
+  background: rgba(192, 57, 43, 0.14);
+  color: var(--danger, #c0392b);
+}
+
+.chat-card-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.chat-card-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.chat-card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 13px;
+}
+
+.chat-card-row dt {
+  color: var(--fg-muted);
+}
+
+.chat-card-row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-card-row.total {
+  font-weight: 700;
+  border-top: 1px solid var(--border-muted);
+  padding-top: 0.35rem;
+}
+
+.chat-card-confirm {
+  align-self: stretch;
+}
+
+.chat-card-error-reason {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger, #c0392b);
+  word-break: break-word;
+}
+
 @media (max-width: 720px) {
   .chat-panel {
     grid-template-columns: 220px minmax(0, 1fr);
