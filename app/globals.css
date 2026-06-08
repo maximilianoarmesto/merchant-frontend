@@ -1030,3 +1030,114 @@ select:disabled {
     background-position: -200% 0;
   }
 }
+
+/* ── Chat composer ─────────────────────────────────────────────── */
+.chat-composer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-muted);
+}
+
+.chat-input {
+  flex: 1;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+}
+
+.chat-input:disabled {
+  opacity: 0.6;
+}
+
+/* ── Per-message hover timestamp ───────────────────────────────── */
+.chat-message-time {
+  font-size: 10px;
+  color: var(--fg-muted);
+  opacity: 0;
+  transition: opacity 0.12s ease-in-out;
+}
+
+.chat-message:hover .chat-message-time,
+.chat-message:focus-within .chat-message-time {
+  opacity: 1;
+}
+
+/* ── Tool "thinking" indicator ─────────────────────────────────── */
+.chat-tool-indicator {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-muted);
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.chat-tool-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border-muted);
+  border-top-color: var(--accent);
+  animation: chat-tool-spin 0.8s linear infinite;
+}
+
+@keyframes chat-tool-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.chat-error {
+  align-self: flex-start;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--danger-soft, #fee);
+  color: var(--danger, #b00);
+  font-size: 13px;
+}
+
+/* ── Rendered markdown inside assistant messages ───────────────── */
+.chat-message-content.markdown :first-child {
+  margin-top: 0;
+}
+
+.chat-message-content.markdown :last-child {
+  margin-bottom: 0;
+}
+
+.chat-message-content.markdown p {
+  margin: 0 0 0.5rem;
+}
+
+.chat-message-content.markdown ul,
+.chat-message-content.markdown ol {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.chat-message-content.markdown code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-muted, rgba(0, 0, 0, 0.05));
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}
+
+.chat-message-content.markdown pre {
+  background: var(--bg-muted, rgba(0, 0, 0, 0.05));
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+.chat-message-content.markdown pre code {
+  background: none;
+  padding: 0;
+}
