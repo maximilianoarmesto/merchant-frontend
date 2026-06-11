@@ -9,6 +9,7 @@ const { act } = require("react") as { act: any };
 
 import ChatPanel from "@/components/ChatPanel";
 import { ConversationStore } from "@/lib/conversation-store";
+import { saveAISettings } from "@/lib/ai-settings";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -47,15 +48,39 @@ async function click(el: Element) {
   });
 }
 
-async function typeInto(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    "value"
-  )!.set!;
+async function typeInto(
+  input: HTMLInputElement | HTMLTextAreaElement,
+  value: string
+) {
+  // Use the prototype that owns the element's native value setter — the
+  // composer is a <textarea>, so calling the HTMLInputElement setter would
+  // throw "Illegal invocation" (brand-checked).
+  const proto =
+    input instanceof window.HTMLTextAreaElement
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, "value")!.set!;
   await act(async () => {
     setter.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
+}
+
+async function keyDown(
+  el: Element,
+  key: string,
+  opts: { shiftKey?: boolean } = {}
+): Promise<KeyboardEvent> {
+  const event = new KeyboardEvent("keydown", {
+    key,
+    shiftKey: opts.shiftKey ?? false,
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => {
+    el.dispatchEvent(event);
+  });
+  return event;
 }
 
 async function submit(form: HTMLFormElement) {
@@ -378,8 +403,8 @@ describe("ChatPanel — message area & streaming renderer", () => {
     h.cleanup();
   });
 
-  function getInput(): HTMLInputElement {
-    return h.container.querySelector<HTMLInputElement>(
+  function getInput(): HTMLTextAreaElement {
+    return h.container.querySelector<HTMLTextAreaElement>(
       "[data-testid='chat-input']"
     )!;
   }
@@ -579,5 +604,285 @@ describe("ChatPanel — message area & streaming renderer", () => {
     expect(time.getAttribute("datetime")).toBe(new Date(ts).toISOString());
     // The timestamp is also exposed as the bubble's native hover tooltip.
     expect(bubble.getAttribute("title")).toBe(new Date(ts).toLocaleString());
+  });
+});
+
+describe("ChatPanel — message input & send logic", () => {
+  let h: TestHarness;
+  beforeEach(() => {
+    h = setup();
+  });
+  afterEach(() => {
+    h.cleanup();
+  });
+
+  function getInput(): HTMLTextAreaElement {
+    return h.container.querySelector<HTMLTextAreaElement>(
+      "[data-testid='chat-input']"
+    )!;
+  }
+  function getComposer(): HTMLFormElement {
+    return h.container.querySelector<HTMLFormElement>(
+      "[data-testid='chat-composer']"
+    )!;
+  }
+  function getSend(): HTMLButtonElement {
+    return h.container.querySelector<HTMLButtonElement>(
+      "[data-testid='chat-send']"
+    )!;
+  }
+  function userMessages(): HTMLElement[] {
+    return Array.from(
+      h.container.querySelectorAll<HTMLElement>(
+        "[data-testid='chat-message'][data-role='user']"
+      )
+    );
+  }
+  async function flush() {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+
+  // AC-1 — Enter sends; Shift+Enter inserts a newline
+  describe("AC-1 Enter sends, Shift+Enter newline", () => {
+    it("sends the message when Enter is pressed without Shift", async () => {
+      const store = new ConversationStore();
+      const pending = makeChannel<unknown>();
+      const streamer: Streamer = () =>
+        pending.iterable as AsyncIterable<unknown>;
+
+      await h.render(<ChatPanel store={store} streamer={streamer as never} />);
+      await typeInto(getInput(), "hello there");
+      const ev = await keyDown(getInput(), "Enter");
+
+      // Enter is consumed by the composer (does not insert a newline).
+      expect(ev.defaultPrevented).toBe(true);
+      const msgs = userMessages();
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].textContent).toContain("hello there");
+      pending.close();
+    });
+
+    it("does NOT send when Shift+Enter is pressed (newline inserted instead)", async () => {
+      const store = new ConversationStore();
+      const pending = makeChannel<unknown>();
+      const streamer: Streamer = () =>
+        pending.iterable as AsyncIterable<unknown>;
+
+      await h.render(<ChatPanel store={store} streamer={streamer as never} />);
+      await typeInto(getInput(), "line one");
+      const ev = await keyDown(getInput(), "Enter", { shiftKey: true });
+
+      // The composer lets the keystroke fall through (default newline behaviour).
+      expect(ev.defaultPrevented).toBe(false);
+      expect(userMessages()).toHaveLength(0);
+      expect(store.listConversations()).toHaveLength(0);
+      pending.close();
+    });
+  });
+
+  // AC-2 — Send button disabled when input is empty or a response is in progress
+  describe("AC-2 send button disabled states", () => {
+    it("is disabled when empty, enabled with text, and disabled while streaming", async () => {
+      const store = new ConversationStore();
+      const ch = makeChannel<{ type: string; delta?: string }>();
+      const streamer: Streamer = () => ch.iterable as AsyncIterable<unknown>;
+
+      await h.render(<ChatPanel store={store} streamer={streamer as never} />);
+
+      // Empty input → disabled.
+      expect(getSend().disabled).toBe(true);
+
+      // Non-empty (after trim) → enabled.
+      await typeInto(getInput(), "   ");
+      expect(getSend().disabled).toBe(true); // whitespace only
+      await typeInto(getInput(), "a question");
+      expect(getSend().disabled).toBe(false);
+
+      // While streaming → disabled (and a Stop button appears).
+      await submit(getComposer());
+      expect(getSend().disabled).toBe(true);
+      expect(
+        h.container.querySelector("[data-testid='chat-stop']")
+      ).not.toBeNull();
+
+      ch.close();
+    });
+  });
+
+  // AC-3 — Active provider/model/key from settings attached to each request
+  describe("AC-3 active settings attached to the request", () => {
+    it("POSTs the active provider, apiKey and model from settings", async () => {
+      saveAISettings({
+        openai: { apiKey: "", selectedModel: "" },
+        anthropic: { apiKey: "sk-ant-secret", selectedModel: "claude-test-1" },
+        activeProvider: "anthropic",
+      });
+
+      const realFetch = global.fetch;
+      const realTextDecoder = (global as { TextDecoder?: unknown }).TextDecoder;
+      // createApiChatStreamer constructs a TextDecoder, absent in jsdom.
+      (global as { TextDecoder?: unknown }).TextDecoder =
+        require("util").TextDecoder;
+
+      let captured: { url: string; body: Record<string, unknown> } | null =
+        null;
+      global.fetch = (async (url: string, init: RequestInit) => {
+        captured = {
+          url: String(url),
+          body: JSON.parse(String(init.body)),
+        };
+        return {
+          ok: true,
+          status: 200,
+          body: {
+            getReader: () => ({
+              read: async () => ({ done: true, value: undefined }),
+            }),
+          },
+        };
+      }) as unknown as typeof fetch;
+
+      try {
+        // No streamer prop → exercises the real getAISettings-backed default.
+        const store = new ConversationStore();
+        await h.render(<ChatPanel store={store} />);
+        await typeInto(getInput(), "what do you sell?");
+        await submit(getComposer());
+        await flush();
+
+        expect(captured).not.toBeNull();
+        expect(captured!.url).toBe("/api/chat");
+        expect(captured!.body.provider).toBe("anthropic");
+        expect(captured!.body.apiKey).toBe("sk-ant-secret");
+        expect(captured!.body.model).toBe("claude-test-1");
+      } finally {
+        global.fetch = realFetch;
+        (global as { TextDecoder?: unknown }).TextDecoder = realTextDecoder;
+      }
+    });
+  });
+
+  // AC-4 — No provider configured → prompt linking to Settings
+  describe("AC-4 no-provider prompt links to Settings", () => {
+    it("shows a Settings link and disables Send when no provider is configured", async () => {
+      // localStorage is cleared in beforeEach → getAISettings().activeProvider is null.
+      const store = new ConversationStore();
+      await h.render(<ChatPanel store={store} />);
+
+      const prompt = h.container.querySelector<HTMLElement>(
+        "[data-testid='chat-no-provider']"
+      );
+      expect(prompt).not.toBeNull();
+      const link = prompt!.querySelector<HTMLAnchorElement>(
+        "[data-testid='chat-settings-link']"
+      )!;
+      expect(link).not.toBeNull();
+      expect(link.getAttribute("href")).toBe("/settings");
+
+      // Even with text typed, sending is disabled until a provider exists.
+      await typeInto(getInput(), "hi");
+      expect(getSend().disabled).toBe(true);
+    });
+  });
+
+  // AC-5 — Streaming response is rendered progressively
+  describe("AC-5 streaming rendered progressively", () => {
+    it("grows the live assistant bubble as deltas arrive", async () => {
+      const store = new ConversationStore();
+      const ch = makeChannel<{ type: string; delta?: string }>();
+      const streamer: Streamer = () => ch.iterable as AsyncIterable<unknown>;
+
+      await h.render(<ChatPanel store={store} streamer={streamer as never} />);
+      await typeInto(getInput(), "hi");
+      await submit(getComposer());
+
+      const live = () =>
+        h.container.querySelector<HTMLElement>("[data-streaming='true']");
+
+      await act(async () => {
+        ch.push({ type: "text", delta: "Par" });
+      });
+      expect(live()!.textContent).toContain("Par");
+      await act(async () => {
+        ch.push({ type: "text", delta: "tial" });
+      });
+      expect(live()!.textContent).toContain("Partial");
+
+      ch.close();
+    });
+  });
+
+  // AC-6 — Stop button cancels the current stream (AbortController)
+  describe("AC-6 stop cancels the stream via AbortController", () => {
+    it("aborts the signal passed to the streamer and ends streaming", async () => {
+      const store = new ConversationStore();
+      const ch = makeChannel<{ type: string; delta?: string }>();
+      let capturedSignal: AbortSignal | undefined;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const streamer = ((messages: any, signal?: AbortSignal) => {
+        capturedSignal = signal;
+        // Real streamers stop when fetch aborts; mimic by closing the channel.
+        signal?.addEventListener("abort", () => ch.close());
+        return ch.iterable;
+      }) as never;
+
+      await h.render(<ChatPanel store={store} streamer={streamer} />);
+      await typeInto(getInput(), "long answer please");
+      await submit(getComposer());
+
+      await act(async () => {
+        ch.push({ type: "text", delta: "thinking…" });
+      });
+
+      const stop = h.container.querySelector<HTMLButtonElement>(
+        "[data-testid='chat-stop']"
+      )!;
+      expect(stop).not.toBeNull();
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal!.aborted).toBe(false);
+
+      await click(stop);
+      await flush();
+
+      expect(capturedSignal!.aborted).toBe(true);
+      // Streaming ended: the Stop button is gone.
+      expect(
+        h.container.querySelector("[data-testid='chat-stop']")
+      ).toBeNull();
+      // No error banner for a user-initiated cancel.
+      expect(
+        h.container.querySelector("[data-testid='chat-error']")
+      ).toBeNull();
+    });
+  });
+
+  // AC-7 — After a successful response, the full assistant message is persisted
+  describe("AC-7 assistant message persisted on completion", () => {
+    it("persists the accumulated assistant text to the ConversationStore", async () => {
+      const store = new ConversationStore();
+      const ch = makeChannel<{ type: string; delta?: string }>();
+      const streamer: Streamer = () => ch.iterable as AsyncIterable<unknown>;
+
+      await h.render(<ChatPanel store={store} streamer={streamer as never} />);
+      await typeInto(getInput(), "hi");
+      await submit(getComposer());
+
+      await act(async () => {
+        ch.push({ type: "text", delta: "Full " });
+      });
+      await act(async () => {
+        ch.push({ type: "text", delta: "answer." });
+      });
+      await act(async () => {
+        ch.close();
+      });
+
+      const conv = store.listConversations()[0];
+      const assistant = conv.messages.filter((m) => m.role === "assistant");
+      expect(assistant).toHaveLength(1);
+      expect(assistant[0].content).toBe("Full answer.");
+    });
   });
 });

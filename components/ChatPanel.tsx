@@ -49,8 +49,23 @@ export default function ChatPanel({
   const [streamingText, setStreamingText] = useState<string>("");
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
+  // AC: whether an AI provider is configured in settings. When false we show a
+  // prompt linking to Settings and disable sending. An injected `streamer`
+  // (tests) is treated as a configured provider.
+  const [providerConfigured, setProviderConfigured] = useState<boolean>(true);
 
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  // Holds the AbortController for the in-flight stream so the Stop button can
+  // cancel it (AC: stop-generation).
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (streamer) {
+      setProviderConfigured(true);
+      return;
+    }
+    setProviderConfigured(getAISettings().activeProvider !== null);
+  }, [streamer]);
 
   const refresh = useCallback(() => {
     setConversations(store.listConversations());
@@ -113,7 +128,7 @@ export default function ChatPanel({
     async (e?: React.FormEvent) => {
       e?.preventDefault();
       const text = input.trim();
-      if (!text || streaming) return;
+      if (!text || streaming || !providerConfigured) return;
 
       // Ensure there is an active conversation to append to.
       let targetId = activeId;
@@ -133,10 +148,13 @@ export default function ChatPanel({
       setActiveTool(null);
       setStreamError(null);
 
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       const history = store.getConversation(targetId)?.messages ?? [];
       let acc = "";
       try {
-        for await (const ev of resolveStreamer()(history)) {
+        for await (const ev of resolveStreamer()(history, controller.signal)) {
           if (ev.type === "text") {
             acc += ev.delta;
             setStreamingText(acc);
@@ -149,19 +167,28 @@ export default function ChatPanel({
           }
         }
       } catch (err) {
-        setStreamError(err instanceof Error ? err.message : "Stream failed.");
+        // A user-initiated abort is not an error to surface.
+        if (!controller.signal.aborted) {
+          setStreamError(err instanceof Error ? err.message : "Stream failed.");
+        }
       } finally {
+        // Persist whatever assistant text accumulated before completion/cancel.
         if (acc.trim()) {
           store.appendMessage(targetId, { role: "assistant", content: acc });
         }
+        abortRef.current = null;
         setStreaming(false);
         setStreamingText("");
         setActiveTool(null);
         refresh();
       }
     },
-    [activeId, input, streaming, store, refresh, resolveStreamer]
+    [activeId, input, streaming, providerConfigured, store, refresh, resolveStreamer]
   );
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   const handleConfirmPurchase = useCallback(
     async (sessionId: string) => {
@@ -302,26 +329,63 @@ export default function ChatPanel({
           )}
         </div>
 
+        {!providerConfigured && (
+          <div
+            className="chat-no-provider"
+            data-testid="chat-no-provider"
+            role="status"
+          >
+            No AI provider is configured.{" "}
+            <a
+              className="chat-settings-link"
+              data-testid="chat-settings-link"
+              href="/settings"
+            >
+              Open Settings
+            </a>{" "}
+            to add a provider, API key and model.
+          </div>
+        )}
+
         <form
           className="chat-composer"
           data-testid="chat-composer"
           onSubmit={handleSend}
         >
-          <input
-            type="text"
+          <textarea
             className="chat-input"
             data-testid="chat-input"
             placeholder="Ask about products, checkout, orders…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={streaming}
+            onKeyDown={(e) => {
+              // Enter sends; Shift+Enter inserts a newline (default behaviour).
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+            rows={1}
+            disabled={streaming || !providerConfigured}
             aria-label="Message"
           />
+          {streaming && (
+            <button
+              type="button"
+              className="btn chat-stop"
+              data-testid="chat-stop"
+              onClick={handleStop}
+            >
+              Stop
+            </button>
+          )}
           <button
             type="submit"
             className="btn primary chat-send"
             data-testid="chat-send"
-            disabled={streaming || input.trim().length === 0}
+            disabled={
+              streaming || !providerConfigured || input.trim().length === 0
+            }
           >
             Send
           </button>
