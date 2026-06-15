@@ -1141,3 +1141,104 @@ select:disabled {
   background: none;
   padding: 0;
 }
+
+/* ── Floating chat widget ──────────────────────────────────────────
+ * A fixed launcher button (bottom-right) that toggles a collapsible
+ * panel layered above all page content. Mounted in the root layout. */
+.chat-widget {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.chat-widget-button {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.chat-widget-button:hover {
+  background: var(--accent-hover);
+}
+
+.chat-widget-button:active {
+  transform: scale(0.96);
+}
+
+.chat-widget-panel {
+  width: 400px;
+  height: 600px;
+  max-height: calc(100vh - 7rem);
+  max-width: calc(100vw - 3rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  background: var(--bg-elevated);
+  overflow: hidden;
+  display: flex;
+  transform-origin: bottom right;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.chat-widget-panel.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.chat-widget-panel.closing {
+  opacity: 0;
+  transform: translateY(12px) scale(0.96);
+  pointer-events: none;
+}
+
+/* The embedded panel should fill the fixed-size widget rather than impose
+ * its own standalone min-height. */
+.chat-widget-panel .chat-panel {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-widget-panel {
+    transition: opacity 0.15s ease;
+    transform: none !important;
+  }
+}
+
+/* On mobile the panel takes the full viewport. */
+@media (max-width: 720px) {
+  .chat-widget {
+    right: 1rem;
+    bottom: 1rem;
+  }
+
+  .chat-widget-panel {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+}
