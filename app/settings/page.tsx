@@ -1,10 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function SettingsPage() {
   const [assistantEnabled, setAssistantEnabled] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setAssistantEnabled(localStorage.getItem("assistant_enabled") === "true");
+    setApiKey(localStorage.getItem("openai_api_key") ?? "");
+  }, []);
+
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), 2000);
+    return () => clearTimeout(timer);
+  }, [saved]);
+
+  function handleSave() {
+    localStorage.setItem("openai_api_key", apiKey);
+    localStorage.setItem("assistant_enabled", String(assistantEnabled));
+    setSaved(true);
+  }
 
   return (
     <div>
@@ -17,11 +35,11 @@ export default function SettingsPage() {
 
       <div className="detail">
         <div>
-          <div className="panel faded">
-            <span className="eyebrow">Coming next</span>
+          <div className="panel">
+            <span className="eyebrow">Assistant</span>
             <h2 style={{ marginBottom: "0.5rem" }}>AI merchant assistant</h2>
             <p className="muted">
-              Soon you will be able to ask an AI assistant to manage your
+              Connect your OpenAI API key to ask an AI assistant to manage your
               products, check inventory, draft descriptions, and search orders
               in natural language.
             </p>
@@ -30,12 +48,12 @@ export default function SettingsPage() {
               className="form"
               onSubmit={(e) => {
                 e.preventDefault();
+                handleSave();
               }}
             >
               <label>
                 Assistant state
                 <select
-                  disabled
                   value={assistantEnabled ? "on" : "off"}
                   onChange={(e) =>
                     setAssistantEnabled(e.target.value === "on")
@@ -51,17 +69,16 @@ export default function SettingsPage() {
                   type="password"
                   placeholder="sk-…"
                   value={apiKey}
-                  disabled
                   onChange={(e) => setApiKey(e.target.value)}
                 />
               </label>
-              <button type="submit" className="btn primary" disabled>
-                Save
+              <button type="submit" className="btn primary">
+                {saved ? "Saved ✓" : "Save"}
               </button>
             </form>
             <p className="faded-hint">
-              This panel is a placeholder for the upcoming Chiron-driven
-              feature.
+              Your API key is stored locally in this browser and never leaves
+              your device.
             </p>
           </div>
         </div>
