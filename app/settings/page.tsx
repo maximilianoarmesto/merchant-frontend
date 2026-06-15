@@ -7,9 +7,16 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [saved, setSaved] = useState(false);
 
+  const [validating, setValidating] = useState(false);
+  const [validated, setValidated] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [models, setModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState("");
+
   useEffect(() => {
     setAssistantEnabled(localStorage.getItem("assistant_enabled") === "true");
     setApiKey(localStorage.getItem("openai_api_key") ?? "");
+    setSelectedModel(localStorage.getItem("openai_model") ?? "");
   }, []);
 
   useEffect(() => {
@@ -18,11 +25,56 @@ export default function SettingsPage() {
     return () => clearTimeout(timer);
   }, [saved]);
 
+  // Editing the key invalidates a previous validation: the model list belongs
+  // to the key that produced it.
+  function handleKeyChange(value: string) {
+    setApiKey(value);
+    setValidated(false);
+    setValidationError(null);
+    setModels([]);
+  }
+
+  async function handleValidate() {
+    if (apiKey.length === 0 || validating) return;
+    setValidating(true);
+    setValidationError(null);
+    try {
+      const res = await fetch("/api/ai/list-models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey }),
+      });
+      if (!res.ok) {
+        setValidated(false);
+        setModels([]);
+        setValidationError("Could not validate key. Check it and try again.");
+        return;
+      }
+      const data = (await res.json()) as { models?: string[] };
+      const available = data.models ?? [];
+      setModels(available);
+      setValidated(true);
+      // Keep a previously saved model selected if it is still available.
+      setSelectedModel((current) =>
+        current && available.includes(current) ? current : "",
+      );
+    } catch {
+      setValidated(false);
+      setModels([]);
+      setValidationError("Could not reach the server. Try again.");
+    } finally {
+      setValidating(false);
+    }
+  }
+
   function handleSave() {
     localStorage.setItem("openai_api_key", apiKey);
     localStorage.setItem("assistant_enabled", String(assistantEnabled));
+    localStorage.setItem("openai_model", selectedModel);
     setSaved(true);
   }
+
+  const canSave = validated && selectedModel.length > 0;
 
   return (
     <div>
@@ -69,10 +121,47 @@ export default function SettingsPage() {
                   type="password"
                   placeholder="sk-…"
                   value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  onChange={(e) => handleKeyChange(e.target.value)}
                 />
               </label>
-              <button type="submit" className="btn primary">
+              <button
+                type="button"
+                className="btn"
+                onClick={handleValidate}
+                disabled={apiKey.length === 0 || validating}
+              >
+                {validating
+                  ? "Validating…"
+                  : validated
+                    ? "Validated ✓"
+                    : "Validate key"}
+              </button>
+              {validationError ? (
+                <p className="faded-hint" style={{ color: "var(--danger, #c0392b)" }}>
+                  {validationError}
+                </p>
+              ) : null}
+              {validated ? (
+                <label>
+                  Model
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                  >
+                    <option value="">Select a model…</option>
+                    {models.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <button
+                type="submit"
+                className="btn primary"
+                disabled={!canSave}
+              >
                 {saved ? "Saved ✓" : "Save"}
               </button>
             </form>
