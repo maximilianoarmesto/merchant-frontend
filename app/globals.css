@@ -745,3 +745,51 @@ select:disabled {
     background-position: -200% 0;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Chat bubble — global floating launcher
+ * Fixed to the viewport corner; sits above page content via z-index but
+ * below nothing it should obstruct. Does not affect document flow, so it
+ * causes no layout shift and never interferes with page scrolling.
+ * ------------------------------------------------------------------------- */
+.chat-bubble {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  height: 56px;
+  padding: 0 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.chat-bubble:hover {
+  background: var(--accent-hover);
+}
+
+.chat-bubble:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.chat-bubble.is-open {
+  background: var(--bg-ink);
+}
+
+.chat-bubble.is-open .chat-bubble-icon {
+  font-size: 24px;
+  line-height: 1;
+}

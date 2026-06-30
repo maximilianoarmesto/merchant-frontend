@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 
 import "./globals.css";
 import Navigation from "@/components/Navigation";
+import ChatBubble from "@/components/ChatBubble";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -39,6 +40,7 @@ export default function RootLayout({
           <Navigation />
           <main className="container">{children}</main>
         </div>
+        <ChatBubble />
       </body>
     </html>
   );
