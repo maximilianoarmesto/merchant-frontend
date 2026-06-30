@@ -13,6 +13,9 @@ export default function SettingsPage() {
   const [models, setModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
 
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<"valid" | "invalid" | null>(null);
+
   useEffect(() => {
     setAssistantEnabled(localStorage.getItem("assistant_enabled") === "true");
     setApiKey(localStorage.getItem("openai_api_key") ?? "");
@@ -32,6 +35,26 @@ export default function SettingsPage() {
     setValidated(false);
     setValidationError(null);
     setModels([]);
+    setTestResult(null);
+  }
+
+  async function handleTest() {
+    if (apiKey.length === 0 || testing) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/ai/validate-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { valid?: boolean };
+      setTestResult(res.ok && data.valid ? "valid" : "invalid");
+    } catch {
+      setTestResult("invalid");
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function handleValidate() {
@@ -124,6 +147,44 @@ export default function SettingsPage() {
                   onChange={(e) => handleKeyChange(e.target.value)}
                 />
               </label>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={handleTest}
+                  disabled={apiKey.length === 0 || testing}
+                >
+                  {testing ? "Testing…" : "Test"}
+                </button>
+                {testResult === "valid" ? (
+                  <span
+                    className="tag"
+                    style={{
+                      color: "var(--accent)",
+                      borderColor: "var(--accent)",
+                    }}
+                  >
+                    ✓ Key is valid
+                  </span>
+                ) : null}
+                {testResult === "invalid" ? (
+                  <span
+                    className="tag"
+                    style={{
+                      color: "var(--danger)",
+                      borderColor: "var(--danger)",
+                    }}
+                  >
+                    ✗ Invalid key
+                  </span>
+                ) : null}
+              </div>
               <button
                 type="button"
                 className="btn"
