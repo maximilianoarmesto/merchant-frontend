@@ -760,11 +760,11 @@ select:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 56px;
+  width: 56px;
   height: 56px;
-  padding: 0 18px;
+  padding: 0;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--accent);
   color: var(--accent-ink);
   font-family: var(--font-sans);
