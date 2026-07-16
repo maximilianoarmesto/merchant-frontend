@@ -9,6 +9,14 @@ type ChatMessage = {
   content: string;
 };
 
+// Quick-start prompts shown while the conversation is empty.
+const SUGGESTED_PROMPTS = [
+  "Browse all products",
+  "Show my orders",
+  "Find products under $50",
+  "Search by name",
+];
+
 export default function ChatBubble() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -34,8 +42,8 @@ export default function ChatBubble() {
     }
   }, [open]);
 
-  async function sendMessage() {
-    const trimmed = input.trim();
+  async function sendMessage(text?: string) {
+    const trimmed = (text ?? input).trim();
     if (trimmed.length === 0 || loading) return;
 
     const apiKey = localStorage.getItem("openai_api_key") ?? "";
@@ -88,6 +96,12 @@ export default function ChatBubble() {
     }
   }
 
+  function handleSuggestion(prompt: string) {
+    // Populate the input for visual feedback, then send immediately.
+    setInput(prompt);
+    void sendMessage(prompt);
+  }
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     // Enter sends; Shift+Enter inserts a newline.
     if (event.key === "Enter" && !event.shiftKey) {
@@ -114,9 +128,24 @@ export default function ChatBubble() {
 
           <div className="chat-panel-messages" ref={scrollRef}>
             {messages.length === 0 && !loading && (
-              <p className="chat-empty">
-                Ask about products or orders to get started.
-              </p>
+              <div className="chat-welcome">
+                <p className="chat-empty">
+                  Ask about products or orders to get started.
+                </p>
+                <div className="chat-suggestions" role="list">
+                  {SUGGESTED_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      role="listitem"
+                      className="chat-suggestion"
+                      onClick={() => handleSuggestion(prompt)}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             {messages.map((message, index) => (
