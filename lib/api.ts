@@ -72,8 +72,28 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+export type ProductFilters = {
+  name?: string;
+  min_price?: number;
+  max_price?: number;
+  category?: string;
+};
+
 export const catalogApi = {
-  listProducts: () => request<Product[]>(`${CATALOG_API_URL}/products`),
+  listProducts: (filters?: ProductFilters) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== null && value !== undefined) {
+          params.append(key, String(value));
+        }
+      }
+    }
+    const query = params.toString();
+    return request<Product[]>(
+      `${CATALOG_API_URL}/products${query ? `?${query}` : ""}`
+    );
+  },
   getProduct: (id: number | string) =>
     request<Product>(`${CATALOG_API_URL}/products/${id}`),
 };
