@@ -2,6 +2,8 @@
 
 FROM node:20-alpine AS deps
 WORKDIR /app
+# better-sqlite3 ships a linuxmusl prebuild in its tarball, so alpine needs no
+# toolchain here. Add python3/make/g++ if that ever stops being true.
 COPY package.json ./
 RUN npm install --no-audit --no-fund
 
@@ -22,12 +24,17 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    PROVIDER_CONFIG_DB_PATH=/app/data/merchant.db
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Mount a volume here to keep merchant provider configs across restarts.
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+VOLUME ["/app/data"]
 
 USER nextjs
 EXPOSE 3000

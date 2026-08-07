@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { CATALOG_API_URL, CHECKOUT_API_URL } from "@/lib/config/public";
+
 export default function SettingsPage() {
   const [assistantEnabled, setAssistantEnabled] = useState(false);
   const [apiKey, setApiKey] = useState("");
@@ -74,17 +76,11 @@ export default function SettingsPage() {
               <dd>merchant-frontend</dd>
               <dt>Catalog API</dt>
               <dd>
-                <code className="inline-code">
-                  {process.env.NEXT_PUBLIC_CATALOG_API_URL ||
-                    "http://localhost:8001"}
-                </code>
+                <code className="inline-code">{CATALOG_API_URL}</code>
               </dd>
               <dt>Checkout API</dt>
               <dd>
-                <code className="inline-code">
-                  {process.env.NEXT_PUBLIC_CHECKOUT_API_URL ||
-                    "http://localhost:8002"}
-                </code>
+                <code className="inline-code">{CHECKOUT_API_URL}</code>
               </dd>
               <dt>Environment</dt>
               <dd>local</dd>

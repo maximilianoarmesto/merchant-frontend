@@ -1,3 +1,5 @@
+import { CATALOG_API_URL, CHECKOUT_API_URL } from "@/lib/config/public";
+
 export type Product = {
   id: number;
   name: string;
@@ -35,11 +37,6 @@ export type Order = {
   order_status: string;
   created_at: string;
 };
-
-const CATALOG_API_URL =
-  process.env.NEXT_PUBLIC_CATALOG_API_URL || "http://localhost:8001";
-const CHECKOUT_API_URL =
-  process.env.NEXT_PUBLIC_CHECKOUT_API_URL || "http://localhost:8002";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const method = (init?.method || "GET").toUpperCase();

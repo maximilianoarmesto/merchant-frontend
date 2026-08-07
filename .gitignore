@@ -4,10 +4,17 @@ node_modules/
 # Next.js build artifacts
 .next/
 out/
+tsconfig.tsbuildinfo
 
 # Production bundle
 build/
 dist/
+
+# Local SQLite database (holds encrypted merchant provider keys)
+data/
+*.db
+*.db-shm
+*.db-wal
 
 # Env / secrets
 .env
