@@ -1,0 +1,6 @@
+# gotcha · 2
+
+> Section index — this project's **gotcha** memory. Open a concept below for the full detail.
+
+- [[gotcha/better-sqlite3-s-native-module-needs-to-be-added]] — better-sqlite3's native module needs to be added to next.config.js…
+- [[gotcha/importing-lib-config-server-ts-or-anything-with]] — Importing lib/config/server.ts (or anything with `server-only`) from a "use client"…
