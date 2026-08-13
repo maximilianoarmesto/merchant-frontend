@@ -1,7 +1,6 @@
 import "server-only";
 
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 import { serverConfig, getCurrentMerchantId } from "@/lib/config/server";
 import { DEFAULT_PROVIDER, type Provider } from "@/lib/models/provider-config";
@@ -9,7 +8,6 @@ import {
   getProviderConfig,
   ProviderConfigNotFoundError,
 } from "@/lib/server/provider-config-repository";
-import type { ChatRequest, ChatResponse } from "@/lib/dto/chat";
 import type { ListModelsResponse, ModelSummary } from "@/lib/dto/list-models";
 import type { SettledKeyValidationState } from "@/lib/dto/validate-key";
 
@@ -58,6 +56,15 @@ function toModelSummary(model: { id: string; owned_by?: string; created?: number
     ownedBy: model.owned_by ?? null,
     created: model.created ?? null,
   };
+}
+
+/**
+ * HTTP status behind a failed provider call, or `undefined` when the failure
+ * never reached OpenAI (timeout, DNS, aborted request). Callers use it to tell
+ * a rejected key (401/403) apart from a transport problem.
+ */
+export function openAIErrorStatus(error: unknown): number | undefined {
+  return error instanceof OpenAI.APIError ? error.status : undefined;
 }
 
 /** Human-readable reason for a failed provider call. */
@@ -138,45 +145,6 @@ export function resolveModel(
   return requested ?? selectedModel ?? serverConfig.openaiDefaultModel;
 }
 
-/**
- * Runs a chat completion with the merchant's stored key.
- * Streaming is handled by the route layer, not here.
- */
-export async function createChatCompletion(
-  request: ChatRequest,
-  merchantId: string = getCurrentMerchantId(),
-): Promise<ChatResponse> {
-  const provider = request.provider ?? DEFAULT_PROVIDER;
-  const config = getProviderConfig(merchantId, provider);
-  if (!config) throw new ProviderConfigNotFoundError(merchantId, provider);
-
-  const model = resolveModel(request.model, config.selectedModel);
-  const messages: ChatCompletionMessageParam[] = request.messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-  }));
-
-  const completion = await createOpenAIClient(config.apiKey).chat.completions.create({
-    model,
-    messages,
-    ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-    ...(request.maxTokens !== undefined ? { max_completion_tokens: request.maxTokens } : {}),
-    stream: false,
-  });
-
-  const choice = completion.choices[0];
-  if (!choice) throw new Error("OpenAI returned no completion choices");
-
-  return {
-    message: { role: "assistant", content: choice.message.content ?? "" },
-    model: completion.model,
-    finishReason: choice.finish_reason ?? null,
-    usage: completion.usage
-      ? {
-          promptTokens: completion.usage.prompt_tokens,
-          completionTokens: completion.usage.completion_tokens,
-          totalTokens: completion.usage.total_tokens,
-        }
-      : null,
-  };
-}
+// Running a chat turn lives in `lib/server/chat-service.ts`: it needs the
+// commerce tool loop and the structured "re-validate your key" error, neither
+// of which belongs in this low-level provider layer.

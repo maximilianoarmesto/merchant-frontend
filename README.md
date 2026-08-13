@@ -34,8 +34,10 @@ Each merchant supplies their own OpenAI API key. The layout:
 | `lib/server/crypto.ts` | AES-256-GCM envelope encryption for stored keys |
 | `lib/server/db.ts` | SQLite connection and `provider_configs` schema |
 | `lib/server/provider-config-repository.ts` | Per-merchant create/update/fetch/delete |
-| `lib/server/openai.ts` | Client factory, key validation, model listing, chat |
+| `lib/server/openai.ts` | Client factory, key validation, model listing |
 | `lib/server/provider-key-service.ts` | Validate a key → persist it → pick a model |
+| `lib/server/commerce-tools.ts` | The read-only tools the assistant may call |
+| `lib/server/chat-service.ts` | Runs a chat turn: stored key + model + tool loop |
 | `lib/models/commerce.ts` | `Product` / `Order` domain models |
 | `lib/dto/commerce.ts` | zod schemas for the catalog/checkout payloads + mappers |
 | `lib/server/commerce-client.ts` | GET-only HTTP client with session forwarding |
@@ -101,6 +103,60 @@ Base URLs come from `serverConfig.catalogApiUrl` / `serverConfig.checkoutApiUrl`
 — the same `NEXT_PUBLIC_*` values the browser uses. `GET /orders/{id}` is
 attempted first for order detail; a 404/405 falls back to selecting the order
 out of the merchant's own `GET /orders`.
+
+## The AI assistant (chat)
+
+`lib/server/chat-service.ts` runs one chat turn. It loads the merchant's key and
+model server-side, hands OpenAI the read-only commerce tools, and loops until
+the model stops asking for data and answers:
+
+```ts
+import { runChatCompletion } from "@/lib/server/chat-service";
+import { requiresKeyRevalidation } from "@/lib/dto/chat";
+
+const result = await runChatCompletion(request); // request carries no API key
+
+if (!result.ok) {
+  // { error, code, action, provider } — e.g. code "key_rejected",
+  // action "revalidate_key" when the stored key stopped working mid-chat.
+  return Response.json(result.error, {
+    status: requiresKeyRevalidation(result.error) ? 409 : 502,
+  });
+}
+result.response.message.content; // the answer
+result.response.toolCalls;       // the reads it made, for "show your work"
+```
+
+Four read-only tools are exposed, each wired to `commerce-repository.ts`:
+`list_products`, `get_product`, `list_orders`, `get_order`. **No mutating tool
+exists.** The model cannot create a checkout session, pay for one, or change a
+product — there is no tool for it, dispatch is by exact name against a closed
+map, and a hallucinated `create_product` comes back to the model as an error
+saying the assistant is read-only. `commerce-client.ts` makes that structural:
+its only outbound call is a hardcoded GET.
+
+The service never throws for a provider failure. It resolves to
+`{ ok: false, error }` with a `code` and an `action` the chat UI can act on
+without string-matching:
+
+| `code` | `action` | When |
+|--------|----------|------|
+| `key_missing` | `configure_key` | No key stored for this merchant |
+| `key_rejected` | `revalidate_key` | 401/403 — key revoked, expired or narrowed since it was validated |
+| `model_unavailable` | `select_model` | 404 — the selected model is out of reach of the key |
+| `provider_rate_limited` | `retry` | 429 |
+| `provider_unavailable` | `retry` | 5xx, timeout, network |
+| `provider_error` | `none` | Anything else |
+
+`key_rejected` is the case worth calling out: a stored key is never
+re-validated in the background (see the key-lifecycle rules above), so the
+first sign it was revoked is a chat turn failing. That turn returns the
+structured error above rather than an empty answer, and the UI prompts the
+merchant to re-validate in Settings. Nothing about the stored config is
+rewritten — re-validation stays an explicit user action.
+
+The tool loop is bounded by `maxToolRounds` (default 4); on the final round the
+tools are withdrawn, so the model always produces an answer.
 
 **The API key never reaches the browser.** It is encrypted at rest, decrypted
 only inside `lib/server/`, and the only shape a route may return is
