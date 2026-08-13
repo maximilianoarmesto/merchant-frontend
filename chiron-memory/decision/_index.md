@@ -1,7 +1,12 @@
-# decision · 3
+# decision · 8
 
 > Section index — this project's **decision** memory. Open a concept below for the full detail.
 
+- [[decision/getorder-id-calls-get-orders-id-first-and-on-a-4]] — getOrder(id) calls GET /orders/{id} first, and on a 404/405 response falls back to…
+- [[decision/getproduct-id-and-getorder-id-return-null-not-th]] — getProduct(id) and getOrder(id) return null (not throw) when the upstream service…
+- [[decision/listproducts-listorders-accept-optional-filter-p]] — listProducts/listOrders accept optional filter params (category, is_active, status,…
 - [[decision/persistence-uses-sqlite-better-sqlite3-wal-mode]] — Persistence uses SQLite (better-sqlite3, WAL mode) with a `provider_configs` table…
 - [[decision/the-chat-request-dto-never-carries-an-api-key-fr]] — The chat request DTO never carries an API key from the client.
+- [[decision/the-read-only-commerce-data-access-layer-is-spli]] — The read-only commerce data-access layer is split into four files
+- [[decision/the-shared-getjson-helper-in-commerce-client-ts]] — The shared getJson helper in commerce-client.ts hardcodes method
 - [[decision/this-task-deliberately-stopped-at-models-dtos-pe]] — This task deliberately stopped at models/DTOs/persistence/config wiring
