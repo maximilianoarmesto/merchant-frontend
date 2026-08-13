@@ -11,7 +11,7 @@ import {
 } from "@/lib/server/provider-config-repository";
 import type { ChatRequest, ChatResponse } from "@/lib/dto/chat";
 import type { ListModelsResponse, ModelSummary } from "@/lib/dto/list-models";
-import type { ValidateKeyResponse } from "@/lib/dto/validate-key";
+import type { SettledKeyValidationState } from "@/lib/dto/validate-key";
 
 /**
  * Server-side OpenAI integration.
@@ -74,15 +74,42 @@ export function describeOpenAIError(error: unknown): string {
 }
 
 /**
- * Checks a key by listing models — the cheapest authenticated call OpenAI
- * offers. The key is not persisted by this function.
+ * One `models.list` call, mapped and sorted newest-first. The chat filter is
+ * left to the caller: validation reports the total reachable count, while the
+ * model picker only ever shows chat-capable models.
  */
-export async function validateApiKey(apiKey: string): Promise<ValidateKeyResponse> {
+export async function fetchModelSummaries(apiKey: string): Promise<ModelSummary[]> {
+  const page = await createOpenAIClient(apiKey).models.list();
+
+  return page.data
+    .map(toModelSummary)
+    .sort((a, b) => (b.created ?? 0) - (a.created ?? 0) || a.id.localeCompare(b.id));
+}
+
+/** Keeps only the models that can serve `chat.completions`. */
+export function filterChatModels(models: ModelSummary[]): ModelSummary[] {
+  return models.filter((model) => isChatModel(model.id));
+}
+
+/**
+ * Checks a key by listing models — the cheapest authenticated call OpenAI
+ * offers, and it doubles as the model list, so a validate-then-list flow costs
+ * a single round trip. The key is not persisted by this function.
+ */
+export async function validateApiKey(
+  apiKey: string,
+  provider: Provider = DEFAULT_PROVIDER,
+): Promise<SettledKeyValidationState> {
   try {
-    const page = await createOpenAIClient(apiKey).models.list();
-    return { valid: true, modelCount: page.data.length };
+    const models = await fetchModelSummaries(apiKey);
+    return {
+      status: "valid",
+      provider,
+      modelCount: models.length,
+      models: filterChatModels(models),
+    };
   } catch (error) {
-    return { valid: false, reason: describeOpenAIError(error) };
+    return { status: "invalid", provider, reason: describeOpenAIError(error) };
   }
 }
 
@@ -92,14 +119,12 @@ export async function listModels(
   options: { chatOnly?: boolean } = {},
 ): Promise<ListModelsResponse> {
   const { chatOnly = true } = options;
-  const page = await createOpenAIClient(apiKey).models.list();
+  const models = await fetchModelSummaries(apiKey);
 
-  const models = page.data
-    .filter((model) => !chatOnly || isChatModel(model.id))
-    .map(toModelSummary)
-    .sort((a, b) => (b.created ?? 0) - (a.created ?? 0) || a.id.localeCompare(b.id));
-
-  return { provider: DEFAULT_PROVIDER, models };
+  return {
+    provider: DEFAULT_PROVIDER,
+    models: chatOnly ? filterChatModels(models) : models,
+  };
 }
 
 /**

@@ -35,10 +35,43 @@ Each merchant supplies their own OpenAI API key. The layout:
 | `lib/server/db.ts` | SQLite connection and `provider_configs` schema |
 | `lib/server/provider-config-repository.ts` | Per-merchant create/update/fetch/delete |
 | `lib/server/openai.ts` | Client factory, key validation, model listing, chat |
+| `lib/server/provider-key-service.ts` | Validate a key → persist it → pick a model |
 | `lib/models/commerce.ts` | `Product` / `Order` domain models |
 | `lib/dto/commerce.ts` | zod schemas for the catalog/checkout payloads + mappers |
 | `lib/server/commerce-client.ts` | GET-only HTTP client with session forwarding |
 | `lib/server/commerce-repository.ts` | `listProducts` / `getProduct` / `listOrders` / `getOrder` |
+
+## Provider key validation and model selection
+
+`lib/server/provider-key-service.ts` owns the key lifecycle. Routes and server
+actions go through it rather than talking to OpenAI and the repository
+themselves:
+
+```ts
+import { providerKeyService } from "@/lib/server/provider-key-service";
+
+// Probe only — reports "validating" via onState, then "valid" | "invalid".
+const state = await providerKeyService.validate(apiKey, { onState: publish });
+
+// Validate, then persist for the merchant only if OpenAI accepted the key.
+const saved = await providerKeyService.saveValidatedKey({ apiKey, selectedModel });
+if (!saved.ok) return { error: saved.reason }; // nothing was written
+
+// Chat-capable models only — embeddings, audio, image and moderation filtered out.
+const models = await providerKeyService.listChatModels();
+await providerKeyService.saveSelectedModel({ model: "gpt-4o-mini" });
+```
+
+Three rules hold:
+
+- **Validation is explicit.** A key is checked only when a caller asks. Nothing
+  re-validates on a timer, and reading a stored config never calls OpenAI, so a
+  key OpenAI later revokes stays on file until the merchant revalidates.
+- **No write before the provider says yes.** A rejected key — or a model the key
+  cannot reach — returns `{ ok: false, reason }` and leaves storage untouched.
+- **The stored model stays usable.** A model can only be saved if it is
+  chat-capable, and re-saving a key clears a selection the new key cannot reach
+  instead of letting it fail at chat time.
 
 ## Server-side commerce reads
 
