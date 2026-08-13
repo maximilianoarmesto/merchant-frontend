@@ -35,6 +35,39 @@ Each merchant supplies their own OpenAI API key. The layout:
 | `lib/server/db.ts` | SQLite connection and `provider_configs` schema |
 | `lib/server/provider-config-repository.ts` | Per-merchant create/update/fetch/delete |
 | `lib/server/openai.ts` | Client factory, key validation, model listing, chat |
+| `lib/models/commerce.ts` | `Product` / `Order` domain models |
+| `lib/dto/commerce.ts` | zod schemas for the catalog/checkout payloads + mappers |
+| `lib/server/commerce-client.ts` | GET-only HTTP client with session forwarding |
+| `lib/server/commerce-repository.ts` | `listProducts` / `getProduct` / `listOrders` / `getOrder` |
+
+## Server-side commerce reads
+
+Server code (the AI assistant, future route handlers) reads products and orders
+through `lib/server/commerce-repository.ts` rather than calling the services
+directly:
+
+```ts
+import { commerceRepository } from "@/lib/server/commerce-repository";
+
+const products = await commerceRepository.listProducts();
+const order = await commerceRepository.getOrder(42); // null when not found
+```
+
+Two invariants hold by construction:
+
+- **Read-only.** `getJson` in `commerce-client.ts` hardcodes `method: "GET"`
+  and accepts neither a method nor a body, so nothing in this layer can create,
+  update or delete upstream state. Writes (checkout sessions, payments) remain
+  in the browser-side `lib/api.ts`.
+- **Merchant-scoped.** Every call replays the inbound request's `Cookie` and
+  `Authorization` headers upstream and sets `X-Merchant-Id`, so the services
+  answer for the merchant who is signed in. Reads outside a request (jobs,
+  tests) must pass an explicit `auth` context.
+
+Base URLs come from `serverConfig.catalogApiUrl` / `serverConfig.checkoutApiUrl`
+— the same `NEXT_PUBLIC_*` values the browser uses. `GET /orders/{id}` is
+attempted first for order detail; a 404/405 falls back to selecting the order
+out of the merchant's own `GET /orders`.
 
 **The API key never reaches the browser.** It is encrypted at rest, decrypted
 only inside `lib/server/`, and the only shape a route may return is
@@ -76,6 +109,7 @@ Server-only — never sent to the browser:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `COMMERCE_API_TIMEOUT_MS` | `10000` | Per-request timeout for server-side catalog/checkout reads |
 | `PROVIDER_CONFIG_DB_PATH` | `./data/merchant.db` | SQLite file holding provider configs |
 | `PROVIDER_CONFIG_ENCRYPTION_KEY` | — | AES-256-GCM key for stored API keys. **Required in production** |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Override for OpenAI-compatible gateways |
