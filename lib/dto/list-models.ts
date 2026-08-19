@@ -3,10 +3,12 @@ import { z } from "zod";
 import { apiKeySchema, merchantIdSchema, optionalProviderSchema } from "@/lib/dto/provider";
 
 /**
- * `POST /api/provider/models`
+ * A model-listing request as the service layer takes it: either supply a key to
+ * probe, or omit it and the merchant's stored key is used.
  *
- * Either supply a key to probe (the settings screen does this before saving)
- * or omit it, in which case the merchant's stored key is used server-side.
+ * `GET /api/provider/models` exposes only the stored-key half — a key never
+ * travels in a query string, and probing one the merchant just typed already
+ * comes back with its models from `POST /api/provider/validate-key`.
  */
 export const listModelsRequestSchema = z.object({
   provider: optionalProviderSchema,

@@ -8,10 +8,12 @@ import { DEFAULT_PROVIDER, type Provider } from "@/lib/models/provider-config";
  * `POST /api/provider/validate-key`
  *
  * The key travels in the request body (never a query string, which would land
- * in access logs) and is checked against the provider without being stored —
- * saving is a separate call (see `saveProviderConfigRequestSchema`). Validation
- * only ever happens because a caller asked for it; nothing re-checks a stored
- * key on a timer.
+ * in access logs). The route checks it against the provider and stores it for
+ * the current merchant only if the provider accepted it — a rejected key leaves
+ * storage untouched. Changing just the model choice needs no key and goes
+ * through `saveProviderConfigRequestSchema` instead. Validation only ever
+ * happens because a caller asked for it; nothing re-checks a stored key on a
+ * timer.
  */
 export const validateKeyRequestSchema = z.object({
   provider: optionalProviderSchema,

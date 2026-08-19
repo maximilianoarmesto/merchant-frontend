@@ -42,6 +42,10 @@ Each merchant supplies their own OpenAI API key. The layout:
 | `lib/dto/commerce.ts` | zod schemas for the catalog/checkout payloads + mappers |
 | `lib/server/commerce-client.ts` | GET-only HTTP client with session forwarding |
 | `lib/server/commerce-repository.ts` | `listProducts` / `getProduct` / `listOrders` / `getOrder` |
+| `lib/server/api-route.ts` | Session lookup and error bodies shared by the API routes |
+| `app/api/provider/validate-key/route.ts` | `POST` — validate a key, store it when accepted |
+| `app/api/provider/models/route.ts` | `GET` — chat-capable models for the stored key |
+| `app/api/chat/route.ts` | `POST` — one assistant turn |
 
 ## Provider key validation and model selection
 
@@ -77,7 +81,7 @@ Three rules hold:
 
 ## Server-side commerce reads
 
-Server code (the AI assistant, future route handlers) reads products and orders
+Server code (the AI assistant, the API route handlers) reads products and orders
 through `lib/server/commerce-repository.ts` rather than calling the services
 directly:
 
@@ -119,9 +123,9 @@ const result = await runChatCompletion(request); // request carries no API key
 if (!result.ok) {
   // { error, code, action, provider } — e.g. code "key_rejected",
   // action "revalidate_key" when the stored key stopped working mid-chat.
-  return Response.json(result.error, {
-    status: requiresKeyRevalidation(result.error) ? 409 : 502,
-  });
+  // `POST /api/chat` returns this body verbatim, with a status per `code`.
+  requiresKeyRevalidation(result.error); // → send the merchant to Settings
+  return result.error;
 }
 result.response.message.content; // the answer
 result.response.toolCalls;       // the reads it made, for "show your work"
@@ -164,6 +168,46 @@ only inside `lib/server/`, and the only shape a route may return is
 key. Every module under `lib/server/` and `lib/config/server.ts` imports
 `server-only`, so an accidental client import fails the build rather than
 leaking a secret.
+
+## HTTP API
+
+Three routes, and the browser talks to nothing else — in particular it never
+talks to OpenAI, and no route ever returns a stored key.
+
+| Route | Input | Success | Failure |
+|-------|-------|---------|---------|
+| `POST /api/provider/validate-key` | `{ apiKey, provider? }` | `200` `{ status: "valid", provider, modelCount, models }` — accepted **and stored** | `200` `{ status: "invalid", provider, reason }`, nothing stored · `400` malformed body |
+| `GET /api/provider/models` | `?provider=` (optional) | `200` `{ provider, models }` — chat-capable models the stored key reaches | `409` no key configured · `502` provider refused the key or was unreachable |
+| `POST /api/chat` | `{ messages, model?, temperature?, maxTokens? }` | `200` `ChatResponse` — the answer plus the reads behind it | `ChatError` with a status per `code` (below) · `400` malformed body |
+
+Every route resolves the merchant from the platform's existing auth/session, via
+`getMerchantSession()` in `lib/server/api-route.ts` — the same
+`getCommerceAuthContext()` the server-side commerce reads use, so the assistant's
+own catalog/order reads carry the caller's `Cookie` and `Authorization` upstream.
+A `merchantId` in a request payload is **not** authoritative: the session decides
+whose key, catalog and orders a request touches.
+
+Error bodies are the app's shared `ApiError` shape (`{ error, errors? }`).
+`POST /api/chat` answers with `ChatError` — `error` plus the `code`/`action` pair
+from the table in the previous section — which is a superset, so a client that
+only reads `error` still works. Statuses by `code`:
+
+| `code` | Status | |
+|--------|--------|---|
+| `key_missing`, `key_rejected`, `model_unavailable` | `409` | The merchant must fix their configuration; `action` says how |
+| `provider_rate_limited` | `429` | |
+| `provider_unavailable` | `503` | |
+| `provider_error` | `502` | |
+
+Two deliberate choices:
+
+- **An invalid key is a `200`.** "This key was rejected, because …" is the answer
+  to a validation request, not a failure of it, and the settings screen renders
+  it from the `status` discriminator. Nothing was written in that case.
+- **A missing key is a `409`, not an empty list**, so the settings screen can
+  tell "no key configured" apart from "this key reaches no chat models".
+
+`stream: true` is rejected with a `400` while the chat service is non-streaming.
 
 ## Local development
 
