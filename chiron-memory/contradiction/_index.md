@@ -1,5 +1,6 @@
-# contradiction · 1
+# contradiction · 2
 
 > Section index — this project's **contradiction** memory. Open a concept below for the full detail.
 
+- [[contradiction/existing-canonical-memory-entries-under-chiron-m]] — Existing canonical memory entries under chiron-memory/config/ stating "this repo has no…
 - [[contradiction/lib-dto-validate-key-ts-and-lib-dto-list-models]] — lib/dto/validate-key.ts and lib/dto/list-models.ts previously had stale comments…
