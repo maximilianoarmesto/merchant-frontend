@@ -209,6 +209,37 @@ Two deliberate choices:
 
 `stream: true` is rejected with a `400` while the chat service is non-streaming.
 
+## Tests
+
+```bash
+npm test          # once
+npm run test:watch
+```
+
+The suite covers the server-side rules that are expensive to get wrong, and it
+runs on Node's built-in test runner — no test framework dependency:
+
+| File | Covers |
+|------|--------|
+| `tests/key-validation.test.ts` | Keys the provider accepts and each way one is refused; nothing is persisted until it is accepted |
+| `tests/model-filtering.test.ts` | Only chat-capable models are ever offered — embedding, audio, image, moderation, instruct and realtime families are excluded at every layer |
+| `tests/read-only-enforcement.test.ts` | No mutating commerce operation is reachable through the chat service: the tool catalog, the name dispatch, and the GET-only HTTP layer |
+| `tests/commerce-scoping.test.ts` | Every commerce read forwards the caller's auth/session upstream and is scoped to the session's merchant |
+| `tests/chat-key-failure.test.ts` | A stored key that stops working mid-chat produces the `revalidate_key` error the chat UI acts on |
+
+Outbound calls go to stub OpenAI, catalog and checkout servers on loopback
+(`tests/support/`) rather than to a patched `fetch`, so header forwarding, the
+GET-only contract and the OpenAI SDK's own error classification are asserted
+against what a server actually received. Provider configs are written to a
+throwaway SQLite file under the OS temp directory.
+
+`tests/support/register.mjs` is what makes the app's sources runnable outside
+the Next.js bundler — it resolves the `@/*` alias, extensionless imports, and
+the `server-only` marker, then starts the stubs before any module reads the
+environment. `npm run lint` is not wired up (ESLint has never been configured
+here, and `next lint` prompts interactively); `npm run typecheck` and
+`npm run build` are the other two gates.
+
 ## Local development
 
 ### With Docker Compose (preferred, from repo root)
