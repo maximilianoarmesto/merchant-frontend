@@ -1,0 +1,333 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - link "Merchant home" [ref=e4] [cursor=pointer]:
+        - /url: /
+        - img "Merchant" [ref=e5]
+      - generic [ref=e6]:
+        - link "Products" [ref=e7] [cursor=pointer]:
+          - /url: /products
+        - link "Orders" [ref=e8] [cursor=pointer]:
+          - /url: /orders
+        - link "Settings" [ref=e9] [cursor=pointer]:
+          - /url: /settings
+    - main [ref=e10]:
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - generic [ref=e13]:
+            - generic [ref=e14]: Catalog
+            - heading "Products" [level=1] [ref=e15]
+          - generic [ref=e16]: 21 items
+        - generic [ref=e18]:
+          - article [ref=e19]:
+            - generic [ref=e20]: Kitchen
+            - generic [ref=e21]:
+              - heading "Coffee Mug" [level=2] [ref=e22]
+              - generic [ref=e23]: $14.99
+            - paragraph [ref=e24]: Ceramic 12oz mug, dishwasher and microwave safe.
+            - generic [ref=e25]: 12 in stock
+            - generic [ref=e27]:
+              - link "View Coffee Mug" [ref=e28] [cursor=pointer]:
+                - /url: /products/1
+                - text: Details
+                - generic [ref=e29]: →
+              - link "Buy Coffee Mug" [ref=e30] [cursor=pointer]:
+                - /url: /checkout?product_id=1
+                - text: Buy Now
+          - article [ref=e31]:
+            - generic [ref=e32]: Accessories
+            - generic [ref=e33]:
+              - heading "Wireless Keyboard" [level=2] [ref=e34]
+              - generic [ref=e35]: $79.99
+            - paragraph [ref=e36]: Compact Bluetooth keyboard with multi-device pairing.
+            - generic [ref=e37]: Out of stock
+            - generic [ref=e39]:
+              - link "View Wireless Keyboard" [ref=e40] [cursor=pointer]:
+                - /url: /products/2
+                - text: Details
+                - generic [ref=e41]: →
+              - button "Unavailable" [disabled] [ref=e42]
+          - article [ref=e43]:
+            - generic [ref=e44]: Accessories
+            - generic [ref=e45]:
+              - heading "USB-C Dock" [level=2] [ref=e46]
+              - generic [ref=e47]: $59.50
+            - paragraph [ref=e48]: 7-in-1 USB-C hub with HDMI, Ethernet, and SD card reader.
+            - generic [ref=e49]: 18 in stock
+            - generic [ref=e51]:
+              - link "View USB-C Dock" [ref=e52] [cursor=pointer]:
+                - /url: /products/3
+                - text: Details
+                - generic [ref=e53]: →
+              - link "Buy USB-C Dock" [ref=e54] [cursor=pointer]:
+                - /url: /checkout?product_id=3
+                - text: Buy Now
+          - article [ref=e55]:
+            - generic [ref=e56]: Stationery
+            - generic [ref=e57]:
+              - heading "Leather Notebook" [level=2] [ref=e58]
+              - generic [ref=e59]: $22.00
+            - paragraph [ref=e60]: A5 hardcover notebook, 200 ruled pages.
+            - generic [ref=e61]: 35 in stock
+            - generic [ref=e63]:
+              - link "View Leather Notebook" [ref=e64] [cursor=pointer]:
+                - /url: /products/4
+                - text: Details
+                - generic [ref=e65]: →
+              - link "Buy Leather Notebook" [ref=e66] [cursor=pointer]:
+                - /url: /checkout?product_id=4
+                - text: Buy Now
+          - article [ref=e67]:
+            - generic [ref=e68]: Electronics
+            - generic [ref=e69]:
+              - heading "HD Webcam" [level=2] [ref=e70]
+              - generic [ref=e71]: $89.00
+            - paragraph [ref=e72]: 1080p webcam with built-in microphone and privacy shutter.
+            - generic [ref=e73]: 7 in stock
+            - generic [ref=e75]:
+              - link "View HD Webcam" [ref=e76] [cursor=pointer]:
+                - /url: /products/5
+                - text: Details
+                - generic [ref=e77]: →
+              - link "Buy HD Webcam" [ref=e78] [cursor=pointer]:
+                - /url: /checkout?product_id=5
+                - text: Buy Now
+          - article [ref=e79]:
+            - generic [ref=e80]: Home Office
+            - generic [ref=e81]:
+              - heading "Desk Lamp" [level=2] [ref=e82]
+              - generic [ref=e83]: $39.90
+            - paragraph [ref=e84]: Adjustable LED desk lamp with 3 brightness levels.
+            - generic [ref=e85]: 21 in stock
+            - generic [ref=e87]:
+              - link "View Desk Lamp" [ref=e88] [cursor=pointer]:
+                - /url: /products/6
+                - text: Details
+                - generic [ref=e89]: →
+              - link "Buy Desk Lamp" [ref=e90] [cursor=pointer]:
+                - /url: /checkout?product_id=6
+                - text: Buy Now
+          - article [ref=e91]:
+            - generic [ref=e92]: Electronics
+            - generic [ref=e93]:
+              - heading "Noise Cancelling Headphones" [level=2] [ref=e94]
+              - generic [ref=e95]: $199.00
+            - paragraph [ref=e96]: Over-ear headphones with 30h battery and ANC.
+            - generic [ref=e97]: Out of stock
+            - generic [ref=e99]:
+              - link "View Noise Cancelling Headphones" [ref=e100] [cursor=pointer]:
+                - /url: /products/7
+                - text: Details
+                - generic [ref=e101]: →
+              - button "Unavailable" [disabled] [ref=e102]
+          - article [ref=e103]:
+            - generic [ref=e104]: Lifestyle
+            - generic [ref=e105]:
+              - heading "Reusable Tote Bag" [level=2] [ref=e106]
+              - generic [ref=e107]: $9.99
+            - paragraph [ref=e108]: Heavy cotton canvas tote, 16L capacity.
+            - generic [ref=e109]: 120 in stock
+            - generic [ref=e111]:
+              - link "View Reusable Tote Bag" [ref=e112] [cursor=pointer]:
+                - /url: /products/8
+                - text: Details
+                - generic [ref=e113]: →
+              - link "Buy Reusable Tote Bag" [ref=e114] [cursor=pointer]:
+                - /url: /checkout?product_id=8
+                - text: Buy Now
+          - article [ref=e115]:
+            - generic [ref=e116]: Lifestyle
+            - generic [ref=e117]:
+              - heading "Stainless Water Bottle" [level=2] [ref=e118]
+              - generic [ref=e119]: $29.00
+            - paragraph [ref=e120]: Double-walled insulated bottle, 24oz, keeps cold 24h.
+            - generic [ref=e121]: 60 in stock
+            - generic [ref=e123]:
+              - link "View Stainless Water Bottle" [ref=e124] [cursor=pointer]:
+                - /url: /products/9
+                - text: Details
+                - generic [ref=e125]: →
+              - link "Buy Stainless Water Bottle" [ref=e126] [cursor=pointer]:
+                - /url: /checkout?product_id=9
+                - text: Buy Now
+          - article [ref=e127]:
+            - generic [ref=e128]: Accessories
+            - generic [ref=e129]:
+              - heading "Laptop Sleeve 14\"" [level=2] [ref=e130]
+              - generic [ref=e131]: $34.50
+            - paragraph [ref=e132]: Felt and neoprene sleeve fits most 13–14 inch laptops.
+            - generic [ref=e133]: 37 in stock
+            - generic [ref=e135]:
+              - link "View Laptop Sleeve 14\"" [ref=e136] [cursor=pointer]:
+                - /url: /products/10
+                - text: Details
+                - generic [ref=e137]: →
+              - link "Buy Laptop Sleeve 14\"" [ref=e138] [cursor=pointer]:
+                - /url: /checkout?product_id=10
+                - text: Buy Now
+          - article [ref=e139]:
+            - generic [ref=e140]: Accessories
+            - generic [ref=e141]:
+              - heading "Ergonomic Mouse" [level=2] [ref=e142]
+              - generic [ref=e143]: $54.00
+            - paragraph [ref=e144]: Vertical wireless mouse, 2.4GHz and Bluetooth.
+            - generic [ref=e145]: 22 in stock
+            - generic [ref=e147]:
+              - link "View Ergonomic Mouse" [ref=e148] [cursor=pointer]:
+                - /url: /products/11
+                - text: Details
+                - generic [ref=e149]: →
+              - link "Buy Ergonomic Mouse" [ref=e150] [cursor=pointer]:
+                - /url: /checkout?product_id=11
+                - text: Buy Now
+          - article [ref=e151]:
+            - generic [ref=e152]: Home Office
+            - generic [ref=e153]:
+              - heading "Monitor Stand" [level=2] [ref=e154]
+              - generic [ref=e155]: $68.00
+            - paragraph [ref=e156]: Solid oak monitor riser, 4.5 inches tall.
+            - generic [ref=e157]: 14 in stock
+            - generic [ref=e159]:
+              - link "View Monitor Stand" [ref=e160] [cursor=pointer]:
+                - /url: /products/12
+                - text: Details
+                - generic [ref=e161]: →
+              - link "Buy Monitor Stand" [ref=e162] [cursor=pointer]:
+                - /url: /checkout?product_id=12
+                - text: Buy Now
+          - article [ref=e163]:
+            - generic [ref=e164]: Home Office
+            - generic [ref=e165]:
+              - heading "Desk Mat" [level=2] [ref=e166]
+              - generic [ref=e167]: $42.00
+            - paragraph [ref=e168]: Large felt and cork desk mat, 36 x 17 inches.
+            - generic [ref=e169]: 27 in stock
+            - generic [ref=e171]:
+              - link "View Desk Mat" [ref=e172] [cursor=pointer]:
+                - /url: /products/13
+                - text: Details
+                - generic [ref=e173]: →
+              - link "Buy Desk Mat" [ref=e174] [cursor=pointer]:
+                - /url: /checkout?product_id=13
+                - text: Buy Now
+          - article [ref=e175]:
+            - generic [ref=e176]: Stationery
+            - generic [ref=e177]:
+              - heading "Mechanical Pencil Set" [level=2] [ref=e178]
+              - generic [ref=e179]: $18.50
+            - paragraph [ref=e180]: Set of three 0.5mm mechanical pencils with spare leads.
+            - generic [ref=e181]: 80 in stock
+            - generic [ref=e183]:
+              - link "View Mechanical Pencil Set" [ref=e184] [cursor=pointer]:
+                - /url: /products/14
+                - text: Details
+                - generic [ref=e185]: →
+              - link "Buy Mechanical Pencil Set" [ref=e186] [cursor=pointer]:
+                - /url: /checkout?product_id=14
+                - text: Buy Now
+          - article [ref=e187]:
+            - generic [ref=e188]: Stationery
+            - generic [ref=e189]:
+              - heading "Sticky Notes Pack" [level=2] [ref=e190]
+              - generic [ref=e191]: $11.25
+            - paragraph [ref=e192]: Pack of 12 pastel sticky-note pads, 100 sheets each.
+            - generic [ref=e193]: 95 in stock
+            - generic [ref=e195]:
+              - link "View Sticky Notes Pack" [ref=e196] [cursor=pointer]:
+                - /url: /products/15
+                - text: Details
+                - generic [ref=e197]: →
+              - link "Buy Sticky Notes Pack" [ref=e198] [cursor=pointer]:
+                - /url: /checkout?product_id=15
+                - text: Buy Now
+          - article [ref=e199]:
+            - generic [ref=e200]: Electronics
+            - generic [ref=e201]:
+              - heading "Bluetooth Speaker" [level=2] [ref=e202]
+              - generic [ref=e203]: $74.00
+            - paragraph [ref=e204]: Portable speaker, 12h battery, IPX5 splash-proof.
+            - generic [ref=e205]: 16 in stock
+            - generic [ref=e207]:
+              - link "View Bluetooth Speaker" [ref=e208] [cursor=pointer]:
+                - /url: /products/16
+                - text: Details
+                - generic [ref=e209]: →
+              - link "Buy Bluetooth Speaker" [ref=e210] [cursor=pointer]:
+                - /url: /checkout?product_id=16
+                - text: Buy Now
+          - article [ref=e211]:
+            - generic [ref=e212]: Electronics
+            - generic [ref=e213]:
+              - heading "HDMI Cable 2m" [level=2] [ref=e214]
+              - generic [ref=e215]: $12.00
+            - paragraph [ref=e216]: Braided HDMI 2.1 cable, 4K/120Hz and 8K/60Hz.
+            - generic [ref=e217]: 140 in stock
+            - generic [ref=e219]:
+              - link "View HDMI Cable 2m" [ref=e220] [cursor=pointer]:
+                - /url: /products/17
+                - text: Details
+                - generic [ref=e221]: →
+              - link "Buy HDMI Cable 2m" [ref=e222] [cursor=pointer]:
+                - /url: /checkout?product_id=17
+                - text: Buy Now
+          - article [ref=e223]:
+            - generic [ref=e224]: Kitchen
+            - generic [ref=e225]:
+              - heading "Travel Mug" [level=2] [ref=e226]
+              - generic [ref=e227]: $24.00
+            - paragraph [ref=e228]: Leak-proof insulated travel mug, 16oz.
+            - generic [ref=e229]: 55 in stock
+            - generic [ref=e231]:
+              - link "View Travel Mug" [ref=e232] [cursor=pointer]:
+                - /url: /products/18
+                - text: Details
+                - generic [ref=e233]: →
+              - link "Buy Travel Mug" [ref=e234] [cursor=pointer]:
+                - /url: /checkout?product_id=18
+                - text: Buy Now
+          - article [ref=e235]:
+            - generic [ref=e236]: Lifestyle
+            - generic [ref=e237]:
+              - heading "Ceramic Planter" [level=2] [ref=e238]
+              - generic [ref=e239]: $19.75
+            - paragraph [ref=e240]: Matte ceramic planter with drainage, 6 inch diameter.
+            - generic [ref=e241]: 30 in stock
+            - generic [ref=e243]:
+              - link "View Ceramic Planter" [ref=e244] [cursor=pointer]:
+                - /url: /products/19
+                - text: Details
+                - generic [ref=e245]: →
+              - link "Buy Ceramic Planter" [ref=e246] [cursor=pointer]:
+                - /url: /checkout?product_id=19
+                - text: Buy Now
+          - article [ref=e247]:
+            - generic [ref=e248]: Home Office
+            - generic [ref=e249]:
+              - heading "Desk Organizer" [level=2] [ref=e250]
+              - generic [ref=e251]: $28.00
+            - paragraph [ref=e252]: Bamboo 5-compartment organizer for pens, cards, and cables.
+            - generic [ref=e253]: 33 in stock
+            - generic [ref=e255]:
+              - link "View Desk Organizer" [ref=e256] [cursor=pointer]:
+                - /url: /products/20
+                - text: Details
+                - generic [ref=e257]: →
+              - link "Buy Desk Organizer" [ref=e258] [cursor=pointer]:
+                - /url: /checkout?product_id=20
+                - text: Buy Now
+          - article [ref=e259]:
+            - generic [ref=e260]: ELECTRONICS
+            - generic [ref=e261]:
+              - heading "USB-C to HDMI Adapter" [level=2] [ref=e262]
+              - generic [ref=e263]: $20.00
+            - paragraph [ref=e264]: Compact adapter that connects USB-C devices to HDMI displays for external video output.
+            - generic [ref=e265]: 9 in stock
+            - generic [ref=e267]:
+              - link "View USB-C to HDMI Adapter" [ref=e268] [cursor=pointer]:
+                - /url: /products/21
+                - text: Details
+                - generic [ref=e269]: →
+              - link "Buy USB-C to HDMI Adapter" [ref=e270] [cursor=pointer]:
+                - /url: /checkout?product_id=21
+                - text: Buy Now
+  - alert [ref=e271]
