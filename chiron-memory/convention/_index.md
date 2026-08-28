@@ -1,0 +1,6 @@
+# convention · 2
+
+> Section index — this project's **convention** memory. Open a concept below for the full detail.
+
+- [[convention/optional-integer-query-params-that-must-be-non-n]] — Optional integer query params that must be non-negative are declared with…
+- [[convention/stock-filter-params-min-stock-max-stock-use-is-n]] — Stock filter params (min_stock, max_stock) use `is not None` checks rather than…

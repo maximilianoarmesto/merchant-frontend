@@ -1,0 +1,6 @@
+# decision · 2
+
+> Section index — this project's **decision** memory. Open a concept below for the full detail.
+
+- [[decision/the-in-stock-query-param-is-forwarded-to-the-ser]] — The `in_stock` query param is forwarded to the service as `bool(in_stock)` rather than…
+- [[decision/when-both-min-stock-and-max-stock-are-provided-a]] — When both `min_stock` and `max_stock` are provided and `min_stock > max_stock`, the route…
